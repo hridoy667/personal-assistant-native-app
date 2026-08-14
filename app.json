@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "personal-assistant-native-app",
+    "name": "Jarvis",
     "slug": "personal-assistant-native-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -33,11 +33,12 @@
           "imageWidth": 76
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     }
   }
 }
