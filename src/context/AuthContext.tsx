@@ -1,7 +1,15 @@
+import { Href, router } from 'expo-router';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { router, Href } from 'expo-router';
-import { authApi, AuthUser, LoginPayload, RegisterPayload } from '../services/api/auth';
-import { tokenStorage } from '../services/api/client';
+import { tokenStorage } from '../lib/client';
+import { authApi } from '../services/authapi';
+import {
+  AuthUser,
+  GenericResponse,
+  LoginPayload,
+  RegisterPayload,
+  RegisterResponse,
+  VerifyEmailPayload,
+} from '../types/auth';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -9,6 +17,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
+  verifyOtp: (payload: VerifyEmailPayload) => Promise<RegisterResponse>;
+  resendOtp: (email: string) => Promise<GenericResponse>;
   logout: () => Promise<void>;
 }
 
@@ -24,8 +34,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const token = await tokenStorage.getAccessToken();
         if (token) {
-          // Token exists - consider user authenticated on start
-          setUser({ id: '', email: '' });
+          const me = await authApi.getMe();
+          setUser(me);
         }
       } catch (error) {
         console.error('Failed to load auth session:', error);
@@ -41,9 +51,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(true);
     try {
       const res = await authApi.login(payload);
-      if (res.success) {
-        setUser({ id: '', email: payload.email });
-        router.replace('/(app)' as Href); // Safely typecast route
+      if (res.success && res.data) {
+        // If API returns user object on login
+        if (res.data.user) {
+          setUser(res.data.user);
+        } else {
+          // Fallback: Fetch profile using newly saved tokens
+          const me = await authApi.getMe();
+          setUser(me);
+        }
+        router.replace('/(app)' as Href);
       }
     } finally {
       setIsLoading(false);
@@ -55,12 +72,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const res = await authApi.register(payload);
       if (res.success) {
-        // Navigate to OTP verification screen passing the email
         router.push({
           pathname: '/(auth)/verify-otp' as Href,
           params: { email: payload.email },
         } as Href);
       }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyOtp = async (payload: VerifyEmailPayload): Promise<RegisterResponse> => {
+    setIsLoading(true);
+    try {
+      const res = await authApi.verifyEmail(payload);
+      if (res.success) {
+        router.replace('/(auth)/login' as Href);
+      }
+      return res;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendOtp = async (email: string): Promise<GenericResponse> => {
+    setIsLoading(true);
+    try {
+      return await authApi.resendOtp(email);
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +111,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setUser(null);
       setIsLoading(false);
-      router.replace('/(auth)/login' as Href); // Safely typecast route
+      router.replace('/(auth)/login' as Href);
     }
   };
 
@@ -85,6 +123,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         isAuthenticated: !!user,
         login,
         register,
+        verifyOtp,
+        resendOtp,
         logout,
       }}
     >
