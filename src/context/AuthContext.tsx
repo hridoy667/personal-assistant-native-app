@@ -29,49 +29,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-useEffect(() => {
-  async function loadStoredSession() {
-    try {
-      const token = await tokenStorage.getAccessToken();
-      const refreshToken = await tokenStorage.getRefreshToken();
-      const userType = await tokenStorage.getUserType();
-
-      console.log('=== 🛠️ STORAGE & JWT PAYLOAD VERIFICATION ===');
-      console.log('1. Raw Access Token:', token ? `${token.substring(0, 25)}...` : '❌ MISSING');
-      console.log('2. Raw Refresh Token:', refreshToken ? `${refreshToken.substring(0, 25)}...` : '❌ MISSING');
-      console.log('3. Stored User Type:', userType || '❌ MISSING');
-
-      if (token) {
-        const decoded: any = jwtDecode(token);
-
-        console.log('4. DECODED JWT PAYLOAD:');
-        console.log('   - User ID (sub):', decoded.sub);
-        console.log('   - Name:', decoded.name);
-        console.log('   - District:', decoded.district);
-        console.log('   - Timezone:', decoded.timzone || decoded.timezone);
-        console.log('   - Avatar URL:', decoded.avatarUrl);
-        console.log('   - Islamic Features:', decoded.enableIslamicFeatures);
-        console.log('   - Mail Assistance:', decoded.enableMailAssistance);
-        console.log('   - Finance Tracker:', decoded.enableFinanceTracker);
-        console.log('   - Health Tracking:', decoded.enableHealthTracking);
-        console.log('   - Screen Time Tracking:', decoded.enableScreenTimeTracking);
-        console.log('   - AI Briefings:', decoded.enableAiBriefings);
-        console.log('   - Entire Payload JSON:', JSON.stringify(decoded, null, 2));
-
-        setUser(decoded as AuthUser);
-      }
-    } catch (error) {
-      console.error('❌ Failed to restore session or decode token:', error);
-      await tokenStorage.clearTokens();
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-      console.log('=============================================');
-    }
-  }
-
-  loadStoredSession();
-}, []);
 
   const login = async (payload: LoginPayload) => {
     setIsLoading(true);
