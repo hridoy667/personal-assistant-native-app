@@ -67,20 +67,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const register = async (payload: RegisterPayload) => {
-    setIsLoading(true);
-    try {
-      const res = await authApi.register(payload);
-      if (res.success) {
-        router.push({
-          pathname: '/(auth)/verify-otp' as Href,
-          params: { email: payload.email },
-        } as Href);
-      }
-    } finally {
-      setIsLoading(false);
+const register = async (payload: RegisterPayload) => {
+    // DO NOT trigger global AuthContext isLoading here if it remounts screens
+    const res = await authApi.register(payload);
+    
+    if (!res.success) {
+        throw new Error(res.message || 'Registration failed. Please try again.');
     }
-  };
+    
+    return res;
+};
 
   const verifyOtp = async (payload: VerifyEmailPayload): Promise<RegisterResponse> => {
     setIsLoading(true);

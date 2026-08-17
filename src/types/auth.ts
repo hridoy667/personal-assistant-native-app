@@ -9,8 +9,21 @@ export interface RegisterPayload {
   name: string;
   phone?: string;
   password?: string;
+  bio?: string;
   district?: string;
-  location?: string;
+  upazila?: string;
+  timezone?: string;
+  dateOfBirth?: string; // ISO date string, e.g. '2000-01-01'
+  gender?: 'MALE' | 'FEMALE'; // matches backend Gender enum exactly
+  height?: number; // meters
+  weight?: number; // kg
+  activityLevel?: 'SEDENTARY' | 'LIGHTLY_ACTIVE' | 'MODERATELY_ACTIVE' | 'VERY_ACTIVE';
+  enableIslamicFeatures?: boolean;
+  enableMailAssistance?: boolean;
+  enableFinanceTracker?: boolean;
+  enableHealthTracking?: boolean;
+  enableScreenTimeTracking?: boolean;
+  enableAiBriefings?: boolean;
   is_agreed_to_terms_and_policy?: boolean;
   image?: {
     uri: string;

@@ -27,15 +27,44 @@ export const authApi = {
   /**
    * Register a new user (POST /auth/register - Multipart/Form-Data)
    */
-  register: async (payload: RegisterPayload): Promise<RegisterResponse> => {
+ register: async (payload: RegisterPayload): Promise<RegisterResponse> => {
     const formData = new FormData();
 
     formData.append('email', payload.email);
     formData.append('name', payload.name);
     if (payload.phone) formData.append('phone', payload.phone);
     if (payload.password) formData.append('password', payload.password);
+    if (payload.bio) formData.append('bio', payload.bio);
     if (payload.district) formData.append('district', payload.district);
-    if (payload.location) formData.append('location', payload.location);
+    if (payload.upazila) formData.append('upazila', payload.upazila);
+    if (payload.timezone) formData.append('timezone', payload.timezone);
+    if (payload.dateOfBirth) formData.append('dateOfBirth', payload.dateOfBirth);
+    if (payload.gender) formData.append('gender', payload.gender);
+    if (payload.height !== undefined) formData.append('height', String(payload.height));
+    if (payload.weight !== undefined) formData.append('weight', String(payload.weight));
+    if (payload.activityLevel) formData.append('activityLevel', payload.activityLevel);
+
+    // Feature flags: send only when explicitly set, so backend @Transform + defaults
+    // still apply cleanly when the user hasn't touched a given toggle.
+    if (payload.enableIslamicFeatures !== undefined) {
+      formData.append('enableIslamicFeatures', String(payload.enableIslamicFeatures));
+    }
+    if (payload.enableMailAssistance !== undefined) {
+      formData.append('enableMailAssistance', String(payload.enableMailAssistance));
+    }
+    if (payload.enableFinanceTracker !== undefined) {
+      formData.append('enableFinanceTracker', String(payload.enableFinanceTracker));
+    }
+    if (payload.enableHealthTracking !== undefined) {
+      formData.append('enableHealthTracking', String(payload.enableHealthTracking));
+    }
+    if (payload.enableScreenTimeTracking !== undefined) {
+      formData.append('enableScreenTimeTracking', String(payload.enableScreenTimeTracking));
+    }
+    if (payload.enableAiBriefings !== undefined) {
+      formData.append('enableAiBriefings', String(payload.enableAiBriefings));
+    }
+
     if (payload.is_agreed_to_terms_and_policy !== undefined) {
       formData.append('is_agreed_to_terms_and_policy', String(payload.is_agreed_to_terms_and_policy));
     }

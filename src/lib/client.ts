@@ -24,6 +24,34 @@ interface RequestOptions extends RequestInit {
   requiresAuth?: boolean;
 }
 
+// Helper: NestJS ValidationPipe (and some custom exceptions) return
+// `message` as a string[] instead of a string. Normalize to a single string
+// so callers always get a clean, displayable message.
+function extractErrorMessage(responseData: any, status: number): string {
+  const raw = responseData?.message;
+  if (Array.isArray(raw) && raw.length > 0) {
+    return raw.join(', ');
+  }
+  if (typeof raw === 'string' && raw.trim().length > 0) {
+    return raw;
+  }
+  return `Request failed with status ${status}`;
+}
+
+// De-dupe concurrent refresh attempts: if multiple requests 401 around the
+// same time, they all share one in-flight refresh instead of each calling
+// /auth/refresh separately (which can race and invalidate rotating tokens).
+let refreshInFlight: Promise<boolean> | null = null;
+
+function getOrStartRefresh(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = refreshAccessToken().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
 /**
  * Base HTTP Request wrapper with JWT injection & automatic token refresh logic.
  */
@@ -50,25 +78,35 @@ export async function apiClient<T>(
     }
   }
 
-  let response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...restOptions,
-    headers: reqHeaders,
-    body,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...restOptions,
+      headers: reqHeaders,
+      body,
+    });
+  } catch (networkError) {
+    // fetch itself threw (offline, DNS failure, server unreachable, etc.)
+    throw new Error('Unable to reach the server. Please check your connection and try again.');
+  }
 
   // Handle Token Expiration (401 Unauthorized) -> Attempt Refresh
   if (response.status === 401 && requiresAuth) {
-    const refreshed = await refreshAccessToken();
+    const refreshed = await getOrStartRefresh();
     if (refreshed) {
       // Retry the original request with the new access token
       const newAccessToken = await tokenStorage.getAccessToken();
       reqHeaders['Authorization'] = `Bearer ${newAccessToken}`;
 
-      response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...restOptions,
-        headers: reqHeaders,
-        body,
-      });
+      try {
+        response = await fetch(`${API_BASE_URL}${endpoint}`, {
+          ...restOptions,
+          headers: reqHeaders,
+          body,
+        });
+      } catch (networkError) {
+        throw new Error('Unable to reach the server. Please check your connection and try again.');
+      }
     } else {
       await tokenStorage.clearTokens();
       throw new Error('Session expired. Please log in again.');
@@ -78,8 +116,7 @@ export async function apiClient<T>(
   const responseData = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const errorMessage = responseData?.message || `Request failed with status ${response.status}`;
-    throw new Error(errorMessage);
+    throw new Error(extractErrorMessage(responseData, response.status));
   }
 
   return responseData as T;
