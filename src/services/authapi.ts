@@ -27,7 +27,7 @@ export const authApi = {
   /**
    * Register a new user (POST /auth/register - Multipart/Form-Data)
    */
- register: async (payload: RegisterPayload): Promise<RegisterResponse> => {
+  register: async (payload: RegisterPayload): Promise<RegisterResponse> => {
     const formData = new FormData();
 
     formData.append('email', payload.email);
@@ -110,18 +110,23 @@ export const authApi = {
    * Login user (POST /auth/login)
    */
   login: async (payload: LoginPayload): Promise<LoginResponse> => {
-    const response = await apiClient<LoginResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      requiresAuth: false,
-    });
+  const response = await apiClient<LoginResponse>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    requiresAuth: false,
+  });
 
-    if (response.data?.accessToken) {
-      await tokenStorage.setTokens(response.data.accessToken, response.data.refreshToken);
-    }
+  // Extract accessToken and refreshToken from response.data
+  if (response.success && response.data?.accessToken && response.data?.refreshToken) {
+    await tokenStorage.setAuthData(
+      response.data.accessToken,
+      response.data.refreshToken,
+      response.type
+    );
+  }
 
-    return response;
-  },
+  return response;
+},
 
   /**
    * Refresh Access & Refresh Tokens (POST /auth/refresh)

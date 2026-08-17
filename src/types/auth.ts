@@ -33,14 +33,29 @@ export interface RegisterPayload {
 }
 
 export interface AuthUser {
-  id: string;
-  email: string;
+  id?: string;
+  sub?: string; // Standard JWT subject claim mapping to user ID
+  email?: string;
   name?: string;
   phone?: string;
   type?: string;
   district?: string;
   location?: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  timezone?: string;
+  timzone?: string; // Accounts for backend payload key spelling variant
+  
+  // Feature Flags
+  enableIslamicFeatures?: boolean;
+  enableMailAssistance?: boolean;
+  enableFinanceTracker?: boolean;
+  enableHealthTracking?: boolean;
+  enableScreenTimeTracking?: boolean;
+  enableAiBriefings?: boolean;
+  
+  shop?: any;
 }
 
 export interface RegisterResponse {
@@ -61,6 +76,7 @@ export interface ResendOtpPayload {
 export interface LoginPayload {
   email: string;
   password?: string;
+  firebaseToken?: string;
 }
 
 export interface LoginResponse {
@@ -70,7 +86,7 @@ export interface LoginResponse {
   data: {
     accessToken: string;
     refreshToken: string;
-    user?: AuthUser; // Added user property here
+    user?: AuthUser;
   };
 }
 

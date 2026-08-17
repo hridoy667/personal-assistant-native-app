@@ -10,6 +10,7 @@ import {
   RegisterResponse,
   VerifyEmailPayload,
 } from '../types/auth';
+import { jwtDecode } from 'jwt-decode';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -28,55 +29,84 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Check stored token and initialize user session on app start
-  useEffect(() => {
-    async function loadStoredSession() {
-      try {
-        const token = await tokenStorage.getAccessToken();
-        if (token) {
-          const me = await authApi.getMe();
-          setUser(me);
-        }
-      } catch (error) {
-        console.error('Failed to load auth session:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
+useEffect(() => {
+  async function loadStoredSession() {
+    try {
+      const token = await tokenStorage.getAccessToken();
+      const refreshToken = await tokenStorage.getRefreshToken();
+      const userType = await tokenStorage.getUserType();
 
-    loadStoredSession();
-  }, []);
+      console.log('=== 🛠️ STORAGE & JWT PAYLOAD VERIFICATION ===');
+      console.log('1. Raw Access Token:', token ? `${token.substring(0, 25)}...` : '❌ MISSING');
+      console.log('2. Raw Refresh Token:', refreshToken ? `${refreshToken.substring(0, 25)}...` : '❌ MISSING');
+      console.log('3. Stored User Type:', userType || '❌ MISSING');
+
+      if (token) {
+        const decoded: any = jwtDecode(token);
+
+        console.log('4. DECODED JWT PAYLOAD:');
+        console.log('   - User ID (sub):', decoded.sub);
+        console.log('   - Name:', decoded.name);
+        console.log('   - District:', decoded.district);
+        console.log('   - Timezone:', decoded.timzone || decoded.timezone);
+        console.log('   - Avatar URL:', decoded.avatarUrl);
+        console.log('   - Islamic Features:', decoded.enableIslamicFeatures);
+        console.log('   - Mail Assistance:', decoded.enableMailAssistance);
+        console.log('   - Finance Tracker:', decoded.enableFinanceTracker);
+        console.log('   - Health Tracking:', decoded.enableHealthTracking);
+        console.log('   - Screen Time Tracking:', decoded.enableScreenTimeTracking);
+        console.log('   - AI Briefings:', decoded.enableAiBriefings);
+        console.log('   - Entire Payload JSON:', JSON.stringify(decoded, null, 2));
+
+        setUser(decoded as AuthUser);
+      }
+    } catch (error) {
+      console.error('❌ Failed to restore session or decode token:', error);
+      await tokenStorage.clearTokens();
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+      console.log('=============================================');
+    }
+  }
+
+  loadStoredSession();
+}, []);
 
   const login = async (payload: LoginPayload) => {
     setIsLoading(true);
     try {
       const res = await authApi.login(payload);
-      if (res.success && res.data) {
-        // If API returns user object on login
+
+      if (!res.success) {
+        throw new Error(res.message || 'Invalid credentials. Please try again.');
+      }
+
+      if (res.data) {
         if (res.data.user) {
           setUser(res.data.user);
         } else {
-          // Fallback: Fetch profile using newly saved tokens
           const me = await authApi.getMe();
           setUser(me);
         }
         router.replace('/(app)' as Href);
       }
+    } catch (error: any) {
+      throw new Error(error?.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-const register = async (payload: RegisterPayload): Promise<RegisterResponse> => {
-    // DO NOT trigger global AuthContext isLoading here if it remounts screens
+  const register = async (payload: RegisterPayload): Promise<RegisterResponse> => {
     const res = await authApi.register(payload);
     
     if (!res.success) {
-        throw new Error(res.message || 'Registration failed. Please try again.');
+      throw new Error(res.message || 'Registration failed. Please try again.');
     }
     
     return res;
-};
+  };
 
   const verifyOtp = async (payload: VerifyEmailPayload): Promise<RegisterResponse> => {
     setIsLoading(true);
@@ -105,6 +135,7 @@ const register = async (payload: RegisterPayload): Promise<RegisterResponse> => 
     try {
       await authApi.logout();
     } finally {
+      await tokenStorage.clearTokens();
       setUser(null);
       setIsLoading(false);
       router.replace('/(auth)/login' as Href);

@@ -5,18 +5,32 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/a
 // Token Storage Keys
 const ACCESS_TOKEN_KEY = 'auth_access_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
+const USER_TYPE_KEY = 'auth_user_type';
 
-// Secure Store Utilities
 export const tokenStorage = {
   getAccessToken: async () => await SecureStore.getItemAsync(ACCESS_TOKEN_KEY),
   getRefreshToken: async () => await SecureStore.getItemAsync(REFRESH_TOKEN_KEY),
+  getUserType: async () => await SecureStore.getItemAsync(USER_TYPE_KEY),
+
+  // Original setTokens method expected by apiClient / refreshAccessToken
   setTokens: async (accessToken: string, refreshToken: string) => {
     await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
     await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
   },
+
+  // Extended method to store user type along with tokens
+  setAuthData: async (accessToken: string, refreshToken: string, userType?: string) => {
+    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
+    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+    if (userType) {
+      await SecureStore.setItemAsync(USER_TYPE_KEY, userType);
+    }
+  },
+
   clearTokens: async () => {
     await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
     await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(USER_TYPE_KEY);
   },
 };
 
