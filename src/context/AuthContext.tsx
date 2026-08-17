@@ -16,7 +16,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (payload: LoginPayload) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<RegisterResponse>;
   verifyOtp: (payload: VerifyEmailPayload) => Promise<RegisterResponse>;
   resendOtp: (email: string) => Promise<GenericResponse>;
   logout: () => Promise<void>;
@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-const register = async (payload: RegisterPayload) => {
+const register = async (payload: RegisterPayload): Promise<RegisterResponse> => {
     // DO NOT trigger global AuthContext isLoading here if it remounts screens
     const res = await authApi.register(payload);
     
