@@ -4,6 +4,7 @@ import {
   CheckPhoneResponse,
   CompleteProfilePayload,
   GenericResponse,
+  GetMeResponse,
   LoginPayload,
   LoginResponse,
   RegisterPayload,
@@ -110,23 +111,23 @@ export const authApi = {
    * Login user (POST /auth/login)
    */
   login: async (payload: LoginPayload): Promise<LoginResponse> => {
-  const response = await apiClient<LoginResponse>('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-    requiresAuth: false,
-  });
+    const response = await apiClient<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      requiresAuth: false,
+    });
 
-  // Extract accessToken and refreshToken from response.data
-  if (response.success && response.data?.accessToken && response.data?.refreshToken) {
-    await tokenStorage.setAuthData(
-      response.data.accessToken,
-      response.data.refreshToken,
-      response.type
-    );
-  }
+    // Extract accessToken and refreshToken from response.data
+    if (response.success && response.data?.accessToken && response.data?.refreshToken) {
+      await tokenStorage.setAuthData(
+        response.data.accessToken,
+        response.data.refreshToken,
+        response.type
+      );
+    }
 
-  return response;
-},
+    return response;
+  },
 
   /**
    * Refresh Access & Refresh Tokens (POST /auth/refresh)
@@ -148,8 +149,8 @@ export const authApi = {
   /**
    * Fetch logged-in user profile (GET /auth/me)
    */
-  getMe: async (): Promise<AuthUser> => {
-    return apiClient<AuthUser>('/auth/me', {
+  getMe: async (): Promise<GetMeResponse> => {
+    return apiClient<GetMeResponse>('/auth/me', {
       method: 'GET',
       requiresAuth: true,
     });
@@ -159,30 +160,66 @@ export const authApi = {
    * Update profile (PATCH /auth/update - Multipart/Form-Data)
    */
   updateProfile: async (
-    payload: UpdateAuthPayload,
-    image?: RegisterPayload['image']
-  ): Promise<AuthUser> => {
-    const formData = new FormData();
+  payload: UpdateAuthPayload,
+  image?: UpdateAuthPayload['image']
+): Promise<AuthUser> => {
+  const formData = new FormData();
 
-    if (payload.name) formData.append('name', payload.name);
-    if (payload.phone) formData.append('phone', payload.phone);
-    if (payload.district) formData.append('district', payload.district);
-    if (payload.location) formData.append('location', payload.location);
+  // Basic Text Fields
+  if (payload.name !== undefined) formData.append('name', payload.name);
+  if (payload.phone !== undefined && payload.phone !== null) formData.append('phone', payload.phone);
+  if (payload.bio !== undefined && payload.bio !== null) formData.append('bio', payload.bio);
+  if (payload.district !== undefined && payload.district !== null) formData.append('district', payload.district);
+  if (payload.upazila !== undefined && payload.upazila !== null) formData.append('upazila', payload.upazila);
+  if (payload.location !== undefined && payload.location !== null) formData.append('location', payload.location);
+  if (payload.timezone !== undefined) formData.append('timezone', payload.timezone);
+  if (payload.dateOfBirth !== undefined && payload.dateOfBirth !== null) formData.append('dateOfBirth', payload.dateOfBirth);
+  if (payload.dailyTargetFocus !== undefined && payload.dailyTargetFocus !== null) {
+    formData.append('dailyTargetFocus', payload.dailyTargetFocus);
+  }
 
-    if (image) {
-      formData.append('image', {
-        uri: image.uri,
-        name: image.name || 'avatar.jpg',
-        type: image.type || 'image/jpeg',
-      } as unknown as Blob);
-    }
+  // Enums & Health Metrics
+  if (payload.gender !== undefined && payload.gender !== null) formData.append('gender', payload.gender);
+  if (payload.height !== undefined && payload.height !== null) formData.append('height', String(payload.height));
+  if (payload.weight !== undefined && payload.weight !== null) formData.append('weight', String(payload.weight));
+  if (payload.activityLevel !== undefined) formData.append('activityLevel', payload.activityLevel);
 
-    return apiClient<AuthUser>('/auth/update', {
-      method: 'PATCH',
-      body: formData,
-      requiresAuth: true,
-    });
-  },
+  // Feature Flags
+  if (payload.enableIslamicFeatures !== undefined) {
+    formData.append('enableIslamicFeatures', String(payload.enableIslamicFeatures));
+  }
+  if (payload.enableMailAssistance !== undefined) {
+    formData.append('enableMailAssistance', String(payload.enableMailAssistance));
+  }
+  if (payload.enableFinanceTracker !== undefined) {
+    formData.append('enableFinanceTracker', String(payload.enableFinanceTracker));
+  }
+  if (payload.enableHealthTracking !== undefined) {
+    formData.append('enableHealthTracking', String(payload.enableHealthTracking));
+  }
+  if (payload.enableScreenTimeTracking !== undefined) {
+    formData.append('enableScreenTimeTracking', String(payload.enableScreenTimeTracking));
+  }
+  if (payload.enableAiBriefings !== undefined) {
+    formData.append('enableAiBriefings', String(payload.enableAiBriefings));
+  }
+
+  // Profile Image Upload
+  const avatarImage = image || payload.image;
+  if (avatarImage) {
+    formData.append('image', {
+      uri: avatarImage.uri,
+      name: avatarImage.name || 'avatar.jpg',
+      type: avatarImage.type || 'image/jpeg',
+    } as unknown as Blob);
+  }
+
+  return apiClient<AuthUser>('/auth/update', {
+    method: 'PATCH',
+    body: formData,
+    requiresAuth: true,
+  });
+},
 
   /**
    * Complete OAuth Profile (POST /auth/complete-profile - Multipart/Form-Data)

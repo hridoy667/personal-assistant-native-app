@@ -1,3 +1,4 @@
+// src/components/cards/WeatherCard.tsx
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -7,11 +8,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { fetchDashboardWeather } from '../../services/weatherApi';
 import { WeatherResponse } from '../../types/weather';
+import { getUserFromToken } from '../../utils/auth';
 
 export const WeatherCard: React.FC = () => {
+  const router = useRouter();
   const [weather, setWeather] = useState<WeatherResponse | null>(null);
+  const [tokenAvatar, setTokenAvatar] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -19,6 +24,12 @@ export const WeatherCard: React.FC = () => {
     setLoading(true);
     setErrorMsg(null);
     try {
+      // Decode user claims directly from JWT token stored locally
+      const tokenData = await getUserFromToken();
+      if (tokenData?.avatarUrl) {
+        setTokenAvatar(tokenData.avatarUrl);
+      }
+
       const data = await fetchDashboardWeather();
       setWeather(data);
     } catch (err: any) {
@@ -70,33 +81,42 @@ export const WeatherCard: React.FC = () => {
   const { condition, thermalComfort, location, userName, alertsAndAdvisories } =
     weather;
 
-  const userAvatarUri = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-    userName || 'User'
-  )}&background=3b82f6&color=fff&bold=true`;
+  // Use avatar from JWT token first, then fallback to initial fallback placeholder
+  const finalAvatarUri =
+    tokenAvatar ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      userName || 'User'
+    )}&background=3b82f6&color=fff&bold=true`;
 
   return (
     <View style={styles.card}>
       <View style={styles.mainContainer}>
-        {/* Left Section: Avatar + Text Details */}
+        {/* Left Section: Avatar + Greeting Details */}
         <View style={styles.leftSection}>
-          <Image source={{ uri: userAvatarUri }} style={styles.avatar} />
-          
+          <TouchableOpacity
+            onPress={() => router.push('/profile')}
+            activeOpacity={0.8}
+          >
+            <Image source={{ uri: finalAvatarUri }} style={styles.avatar} />
+          </TouchableOpacity>
+
           <View style={styles.detailsContainer}>
             <Text style={styles.greeting} numberOfLines={1}>
               {getGreeting(userName)}
             </Text>
-            
+
             <Text style={styles.feelsLikeText} numberOfLines={1}>
-              Feels Like {Math.round(thermalComfort.feelsLike)}°C • {condition.summary}
+              Feels Like {Math.round(thermalComfort.feelsLike)}°C •{' '}
+              {condition.summary}
             </Text>
-            
+
             <Text style={styles.locationText} numberOfLines={1}>
               📍 {location}
             </Text>
           </View>
         </View>
 
-        {/* Right Section: Icon stacked above Temperature */}
+        {/* Right Section: Weather Icon + Temperature */}
         <View style={styles.rightSection}>
           {condition.icon && (
             <Image
@@ -151,6 +171,8 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#3b82f6',
   },
   detailsContainer: {
     flex: 1,

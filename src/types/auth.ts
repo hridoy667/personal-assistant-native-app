@@ -32,21 +32,30 @@ export interface RegisterPayload {
   };
 }
 
+
 export interface AuthUser {
   id?: string;
   sub?: string; // Standard JWT subject claim mapping to user ID
   email?: string;
   name?: string;
-  phone?: string;
+  phone?: string | null;
   type?: string;
-  district?: string;
-  location?: string;
+  bio?: string | null;
+  dateOfBirth?: string | Date | null;
+  gender?: 'MALE' | 'FEMALE' | string | null;
+  district?: string | null;
+  upazila?: string | null;
+  location?: string | null;
   avatarUrl?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  height?: number | null;
+  weight?: number | null;
+  activityLevel?: 'SEDENTARY' | 'LIGHTLY_ACTIVE' | 'MODERATELY_ACTIVE' | 'VERY_ACTIVE' | string;
+  dailyTargetFocus?: string | null;
   timezone?: string;
   timzone?: string; // Accounts for backend payload key spelling variant
-  
+
   // Feature Flags
   enableIslamicFeatures?: boolean;
   enableMailAssistance?: boolean;
@@ -54,8 +63,16 @@ export interface AuthUser {
   enableHealthTracking?: boolean;
   enableScreenTimeTracking?: boolean;
   enableAiBriefings?: boolean;
-  
-  shop?: any;
+
+  // Notification Preferences
+  isNotificationOn?: boolean;
+  emailNotification?: boolean;
+}
+
+export interface GetMeResponse {
+  success: boolean;
+  message: string;
+  data: AuthUser;
 }
 
 export interface RegisterResponse {
@@ -114,8 +131,36 @@ export interface CompleteProfilePayload {
 export interface UpdateAuthPayload {
   name?: string;
   phone?: string;
+  bio?: string;
   district?: string;
+  upazila?: string;
   location?: string;
+  timezone?: string;
+  dateOfBirth?: string;
+  gender?: 'MALE' | 'FEMALE' | null;
+  height?: number | null;
+  weight?: number | null;
+  activityLevel?: 'SEDENTARY' | 'LIGHTLY_ACTIVE' | 'MODERATELY_ACTIVE' | 'VERY_ACTIVE';
+  dailyTargetFocus?: string;
+  enableIslamicFeatures?: boolean;
+  enableMailAssistance?: boolean;
+  enableFinanceTracker?: boolean;
+  enableHealthTracking?: boolean;
+  enableScreenTimeTracking?: boolean;
+  enableAiBriefings?: boolean;
+  isNotificationOn?: boolean;
+  emailNotification?: boolean;
+  image?: {
+    uri: string;
+    name?: string;
+    type?: string;
+  };
+}
+
+export interface UpdateProfileResponse {
+  success: boolean;
+  message: string;
+  data: AuthUser;
 }
 
 export interface GenericResponse {
