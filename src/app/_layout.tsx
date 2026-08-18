@@ -1,10 +1,8 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '../context/AuthContext';
-import { View, ActivityIndicator } from 'react-native';
-
-
-// 2. Add NativeWind Interop Bridge for Expo SDK 54
+import { ActivityIndicator, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
@@ -24,16 +22,23 @@ function RootLayoutNav() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-900">
+      <GestureHandlerRootView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#6366f1" />
-      </View>
+      </GestureHandlerRootView>
     );
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-    </Stack>
+    <GestureHandlerRootView style={styles.container}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { flex: 1, backgroundColor: '#f8fafc' },
+        }}
+      >
+        <Stack.Screen name="index" />
+      </Stack>
+    </GestureHandlerRootView>
   );
 }
 
@@ -44,3 +49,15 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0f172a',
+  },
+});

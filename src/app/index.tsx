@@ -14,9 +14,9 @@ export default function Index() {
     );
   }
 
-  // If user is already logged in, send them to the Dashboard app group
+  // Redirect to the tabs index route inside the app layout group
   if (isAuthenticated) {
-    return <Redirect href="/(app)" />;
+    return <Redirect href="/(app)/(tabs)" />;
   }
 
   // If user is NOT logged in, send them to the Login screen

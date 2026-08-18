@@ -10,7 +10,6 @@ import {
   RegisterResponse,
   VerifyEmailPayload,
 } from '../types/auth';
-import { jwtDecode } from 'jwt-decode';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -29,6 +28,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Initialize session on startup
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        const token = await tokenStorage.getAccessToken();
+        if (token) {
+          const userData = await authApi.getMe();
+          if (isMounted) setUser(userData);
+        }
+      } catch (error) {
+        // Clear invalid tokens if initial profile fetch fails (network timeout, 401, etc.)
+        await tokenStorage.clearTokens();
+        if (isMounted) setUser(null);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const login = async (payload: LoginPayload) => {
     setIsLoading(true);
@@ -91,6 +116,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(true);
     try {
       await authApi.logout();
+    } catch {
+      // Ignore API logout errors to guarantee local state is cleared
     } finally {
       await tokenStorage.clearTokens();
       setUser(null);
