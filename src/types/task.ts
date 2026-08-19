@@ -11,9 +11,17 @@ export enum EnergyRequirement {
   HIGH = 'HIGH',
 }
 
+// 1. ADD: Status filter enum matching backend
+export enum TaskStatusFilter {
+  ALL = 'all',
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+}
+
 export interface Task {
   id: string;
   title: string;
+  description?: string;
   priority: TaskPriority;
   energyRequired: EnergyRequirement;
   isCompleted: boolean;
@@ -40,28 +48,30 @@ export interface CreateTaskPayload {
 
 export interface UpdateTaskPayload extends Partial<CreateTaskPayload> {}
 
+// 2. UPDATE: PaginationQuery to accept status filter string/enum
 export interface PaginationQuery {
   cursor?: string;
   limit?: number;
   search?: string;
+  status?: TaskStatusFilter | 'all' | 'pending' | 'completed';
 }
 
+// 3. UPDATE: PaginatedTaskResponse to include 'total' inside meta
 export interface PaginatedTaskResponse {
   success: boolean;
   data: Task[];
   meta: {
+    total: number; // Added total count from Prisma
     nextCursor?: string;
     hasNextPage: boolean;
   };
 }
 
-// Single task API response matching your NestJS service return { success: true, task }
 export interface GetSingleTaskResponse {
   success: boolean;
   task: Task;
 }
 
-// Generic single entity wrapper if you want to reuse across other modules
 export interface SingleEntityResponse<T> {
   success: boolean;
   data?: T;

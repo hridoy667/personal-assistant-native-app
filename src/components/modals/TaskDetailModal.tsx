@@ -17,7 +17,7 @@ import {
   Zap,
   AlertCircle,
 } from 'lucide-react-native';
-import { Task, TaskPriority } from '@/types/task';
+import { CreateTaskPayload, Task, TaskPriority } from '@/types/task';
 
 interface TaskDetailModalProps {
   visible: boolean;
@@ -26,6 +26,8 @@ interface TaskDetailModalProps {
   loading: boolean;
   error: string | null;
   onClose: () => void;
+  onUpdate?: (id: string, payload: CreateTaskPayload) => Promise<void>;
+  onDelete?: (id: string) => Promise<void>;
   onToggle: (id: string) => void;
   getPriorityConfig: (priority: TaskPriority) => {
     badgeBg: string;
@@ -41,6 +43,8 @@ export function TaskDetailModal({
   error,
   onClose,
   onToggle,
+  onDelete,
+  onUpdate,
   getPriorityConfig,
 }: TaskDetailModalProps) {
   return (

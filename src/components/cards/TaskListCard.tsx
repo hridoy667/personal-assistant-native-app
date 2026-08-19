@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,9 @@ import {
   Eye,
   NotebookPen,
 } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { taskService } from '@/services/task.service';
-import { Task, TaskPriority } from '@/types/task';
+import { Task, TaskPriority, CreateTaskPayload } from '@/types/task';
 import { TaskDetailModal } from '../modals/TaskDetailModal';
 
 interface TaskListCardProps {
@@ -53,9 +53,12 @@ export function TaskListCard({
     }
   };
 
-  useEffect(() => {
-    loadInitialTasks();
-  }, []);
+  // Re-fetch tasks whenever screen comes back into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadInitialTasks();
+    }, [])
+  );
 
   const handleToggle = async (id: string) => {
     setTasks((prev) =>
@@ -69,12 +72,39 @@ export function TaskListCard({
     try {
       await taskService.toggleTask(id);
     } catch (error) {
+      // Rollback on error
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
       );
       if (selectedTask?.id === id) {
         setSelectedTask((prev) => (prev ? { ...prev, isCompleted: !prev.isCompleted } : null));
       }
+    }
+  };
+
+  const handleUpdateTask = async (id: string, payload: CreateTaskPayload) => {
+    try {
+      await taskService.updateTask(id, payload);
+      // Re-fetch to ensure list stays synced with updated data
+      await loadInitialTasks();
+      handleCloseModal();
+    } catch (error) {
+      console.error('Failed to update task:', error);
+    }
+  };
+
+  const handleDeleteTask = async (id: string) => {
+    // Optimistic delete from UI
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    handleCloseModal();
+
+    try {
+      await taskService.deleteTask(id);
+      // Re-fetch to pull the next priority task into the 4-item view
+      loadInitialTasks();
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      loadInitialTasks();
     }
   };
 
@@ -246,6 +276,8 @@ export function TaskListCard({
         error={modalError}
         onClose={handleCloseModal}
         onToggle={handleToggle}
+        onUpdate={handleUpdateTask}
+        onDelete={handleDeleteTask}
         getPriorityConfig={getPriorityConfig}
       />
     </>
