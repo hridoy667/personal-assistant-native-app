@@ -9,9 +9,12 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Search, Sparkles } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Plus, Search, Sparkles, CheckCircle2, Clock } from 'lucide-react-native';
+
 import { TaskItem } from '@/components/TaskItem';
 import { TaskFormModal } from '@/components/modals/TaskFormModal';
 import { Task, CreateTaskPayload } from '@/types/task';
@@ -35,13 +38,13 @@ export default function TasksScreen() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  // Filter Tab State (Passes 'all' | 'pending' | 'completed' directly to backend API)
+  // Filter Tab State ('all' | 'pending' | 'completed')
   const [activeSection, setActiveSection] = useState<'all' | 'pending' | 'completed'>('all');
 
   // Track user scroll momentum to prevent premature onEndReached firing
   const onEndReachedCalledDuringMomentum = useRef<boolean>(true);
 
-  // Fetch First Page (Runs on Search query change or Status Tab switch)
+  // Fetch First Page
   const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
@@ -161,138 +164,360 @@ export default function TasksScreen() {
     );
   };
 
+  // Compute tasks metadata for hero metrics
+  const completedCount = tasks.filter(t => t.isCompleted).length;
+  const pendingCount = tasks.length - completedCount;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>My Tasks</Text>
-            <Text style={styles.subtitle}>{totalCount} tasks found</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => {
-              setEditingTask(null);
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B0F17" />
+
+      {/* Main List Container */}
+      <FlatList
+        data={tasks}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <TaskItem
+            task={item}
+            onToggle={handleToggleTask}
+            onDelete={handleDeleteTask}
+            onEdit={t => {
+              setEditingTask(t);
               setIsModalOpen(true);
             }}
-            activeOpacity={0.8}
-          >
-            <Plus color="#FFFFFF" size={20} />
-            <Text style={styles.addButtonText}>New Task</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <Search color="#64748B" size={18} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search tasks..."
-            placeholderTextColor="#64748B"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-
-        {/* Filter Tabs */}
-        <View style={styles.filterTabs}>
-          <TouchableOpacity
-            style={[styles.filterTab, activeSection === 'all' && styles.activeFilterTab]}
-            onPress={() => setActiveSection('all')}
-          >
-            <Text style={[styles.filterTabText, activeSection === 'all' && styles.activeFilterTabText]}>
-              All
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterTab, activeSection === 'pending' && styles.activeFilterTab]}
-            onPress={() => setActiveSection('pending')}
-          >
-            <Text style={[styles.filterTabText, activeSection === 'pending' && styles.activeFilterTabText]}>
-              Pending
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterTab, activeSection === 'completed' && styles.activeFilterTab]}
-            onPress={() => setActiveSection('completed')}
-          >
-            <Text style={[styles.filterTabText, activeSection === 'completed' && styles.activeFilterTabText]}>
-              Completed
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Task List */}
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#6366F1" />
-          </View>
-        ) : (
-          <FlatList
-            data={tasks}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-              <TaskItem
-                task={item}
-                onToggle={handleToggleTask}
-                onDelete={handleDeleteTask}
-                onEdit={t => {
-                  setEditingTask(t);
-                  setIsModalOpen(true);
-                }}
-              />
-            )}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-            onEndReached={fetchNextPage}
-            onEndReachedThreshold={0.2}
-            onMomentumScrollBegin={() => {
-              onEndReachedCalledDuringMomentum.current = false;
-            }}
-            ListFooterComponent={renderFooter}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366F1" />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Sparkles color="#64748B" size={36} />
-                <Text style={styles.emptyText}>No tasks found</Text>
-              </View>
-            }
           />
         )}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onEndReached={fetchNextPage}
+        onEndReachedThreshold={0.2}
+        onMomentumScrollBegin={() => {
+          onEndReachedCalledDuringMomentum.current = false;
+        }}
+        ListFooterComponent={renderFooter}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366F1" />
+        }
+        ListHeaderComponent={
+          <>
+            {/* Top Header */}
+            <View style={styles.header}>
+              <View>
+                <Text style={styles.headerSubtitle}>WORKFLOW</Text>
+                <Text style={styles.headerTitle}>Task Manager</Text>
+              </View>
 
-        {/* Reusable Form Modal */}
-        <TaskFormModal
-          visible={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSubmit={handleFormSubmit}
-          initialTask={editingTask}
-        />
-      </View>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.addBtnContainer}
+                onPress={() => {
+                  setEditingTask(null);
+                  setIsModalOpen(true);
+                }}
+              >
+                <LinearGradient
+                  colors={['#6366F1', '#4F46E5']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.addBtnGradient}
+                >
+                  <Plus color="#FFFFFF" size={18} />
+                  <Text style={styles.addBtnText}>New Task</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+
+            {/* Hero Overview Card */}
+            <LinearGradient
+              colors={['#1E1B4B', '#0F172A']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroCard}
+            >
+              <View style={styles.heroHeader}>
+                <Text style={styles.heroTitle}>Productivity Summary</Text>
+                <Text style={styles.heroBadge}>Active Session</Text>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.statsRow}>
+                <View style={styles.statBox}>
+                  <Text style={styles.statNumber}>{totalCount}</Text>
+                  <Text style={styles.statLabel}>Total Found</Text>
+                </View>
+
+                <View style={styles.statBorder} />
+
+                <View style={styles.statBox}>
+                  <View style={styles.statLabelRow}>
+                    <Clock color="#F59E0B" size={12} />
+                    <Text style={styles.statNumberAlt}>{pendingCount}</Text>
+                  </View>
+                  <Text style={styles.statLabel}>Pending</Text>
+                </View>
+
+                <View style={styles.statBorder} />
+
+                <View style={styles.statBox}>
+                  <View style={styles.statLabelRow}>
+                    <CheckCircle2 color="#10B981" size={12} />
+                    <Text style={styles.statNumberAlt}>{completedCount}</Text>
+                  </View>
+                  <Text style={styles.statLabel}>Completed</Text>
+                </View>
+              </View>
+            </LinearGradient>
+
+            {/* Search Input */}
+            <View style={styles.searchContainer}>
+              <Search color="#64748B" size={18} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search tasks..."
+                placeholderTextColor="#64748B"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+
+            {/* Filter Tabs */}
+            <View style={styles.filterTabs}>
+              <TouchableOpacity
+                style={[styles.filterTab, activeSection === 'all' && styles.activeFilterTab]}
+                onPress={() => setActiveSection('all')}
+              >
+                <Text style={[styles.filterTabText, activeSection === 'all' && styles.activeFilterTabText]}>
+                  All
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterTab, activeSection === 'pending' && styles.activeFilterTab]}
+                onPress={() => setActiveSection('pending')}
+              >
+                <Text style={[styles.filterTabText, activeSection === 'pending' && styles.activeFilterTabText]}>
+                  Pending
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterTab, activeSection === 'completed' && styles.activeFilterTab]}
+                onPress={() => setActiveSection('completed')}
+              >
+                <Text style={[styles.filterTabText, activeSection === 'completed' && styles.activeFilterTabText]}>
+                  Completed
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.centerContainer}>
+              <ActivityIndicator size="large" color="#6366F1" />
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Sparkles color="#6366F1" size={36} />
+              <Text style={styles.emptyTitle}>No Tasks Found</Text>
+              <Text style={styles.emptySub}>Create a task to kickstart your day.</Text>
+            </View>
+          )
+        }
+      />
+
+      {/* Reusable Form Modal */}
+      <TaskFormModal
+        visible={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleFormSubmit}
+        initialTask={editingTask}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0F172A' },
-  container: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  title: { fontSize: 24, fontWeight: '700', color: '#FFFFFF' },
-  subtitle: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
-  addButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#6366F1', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, gap: 6 },
-  addButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1E293B', borderRadius: 10, paddingHorizontal: 12, height: 44, borderWidth: 1, borderColor: '#334155', marginBottom: 14 },
-  searchInput: { flex: 1, color: '#FFFFFF', fontSize: 14, marginLeft: 8 },
-  filterTabs: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  filterTab: { flex: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: '#1E293B', borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
-  activeFilterTab: { backgroundColor: '#334155', borderColor: '#6366F1' },
-  filterTabText: { fontSize: 12, fontWeight: '500', color: '#94A3B8' },
-  activeFilterTabText: { color: '#FFFFFF', fontWeight: '600' },
-  listContainer: { paddingBottom: 24 },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 60, gap: 10 },
-  emptyText: { color: '#64748B', fontSize: 15 },
-  footerLoader: { paddingVertical: 16, alignItems: 'center' },
+  container: {
+    flex: 1,
+    backgroundColor: '#0B0F17',
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16, // Matches Wellbeing page bottom padding
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerSubtitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#6366F1',
+    letterSpacing: 1.5,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#F8FAFC',
+  },
+  addBtnContainer: {
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  addBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  addBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+
+  // Hero Overview Card
+  heroCard: {
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#312E81',
+  },
+  heroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  heroBadge: {
+    fontSize: 11,
+    color: '#A5B4FC',
+    backgroundColor: '#312E81',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#312E81',
+    marginVertical: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  statNumberAlt: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginLeft: 4,
+  },
+  statLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  statBorder: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#312E81',
+  },
+
+  // Search Input
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#151C2C',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    marginBottom: 14,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#F8FAFC',
+    fontSize: 14,
+    marginLeft: 10,
+  },
+
+  // Filter Tabs
+  filterTabs: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#151C2C',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  activeFilterTab: {
+    backgroundColor: '#312E81',
+    borderColor: '#6366F1',
+  },
+  filterTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  activeFilterTabText: {
+    color: '#F8FAFC',
+    fontWeight: '700',
+  },
+
+  // States
+  centerContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+  },
+  emptyTitle: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 12,
+  },
+  emptySub: {
+    color: '#64748B',
+    fontSize: 13,
+    marginTop: 4,
+  },
+  footerLoader: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
 });

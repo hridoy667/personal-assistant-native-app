@@ -82,7 +82,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0b0f19e3',
+    backgroundColor: '#0b0f17',
   },
   listContent: {
     paddingHorizontal: 16,

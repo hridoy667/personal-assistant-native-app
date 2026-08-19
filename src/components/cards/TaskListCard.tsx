@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFonts, PatrickHand_400Regular } from '@expo-google-fonts/patrick-hand';
 import {
   CheckCircle2,
   Circle,
@@ -33,6 +35,11 @@ export function TaskListCard({
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Load Google Font dynamically
+  const [fontsLoaded] = useFonts({
+    PatrickHand: PatrickHand_400Regular,
+  });
+
   // Modal State
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -53,7 +60,6 @@ export function TaskListCard({
     }
   };
 
-  // Re-fetch tasks whenever screen comes back into focus
   useFocusEffect(
     useCallback(() => {
       loadInitialTasks();
@@ -72,7 +78,6 @@ export function TaskListCard({
     try {
       await taskService.toggleTask(id);
     } catch (error) {
-      // Rollback on error
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
       );
@@ -85,7 +90,6 @@ export function TaskListCard({
   const handleUpdateTask = async (id: string, payload: CreateTaskPayload) => {
     try {
       await taskService.updateTask(id, payload);
-      // Re-fetch to ensure list stays synced with updated data
       await loadInitialTasks();
       handleCloseModal();
     } catch (error) {
@@ -94,13 +98,11 @@ export function TaskListCard({
   };
 
   const handleDeleteTask = async (id: string) => {
-    // Optimistic delete from UI
     setTasks((prev) => prev.filter((t) => t.id !== id));
     handleCloseModal();
 
     try {
       await taskService.deleteTask(id);
-      // Re-fetch to pull the next priority task into the 4-item view
       loadInitialTasks();
     } catch (error) {
       console.error('Failed to delete task:', error);
@@ -172,6 +174,8 @@ export function TaskListCard({
     }
   };
 
+  const fontStyle = fontsLoaded ? { fontFamily: 'PatrickHand' } : {};
+
   const renderTaskItem = ({ item, index }: { item: Task; index: number }) => {
     const isLast = index === tasks.length - 1;
 
@@ -183,13 +187,14 @@ export function TaskListCard({
           activeOpacity={0.7}
         >
           {item.isCompleted ? (
-            <CheckCircle2 size={18} color="#10b981" />
+            <CheckCircle2 size={20} color="#10b981" />
           ) : (
-            <Circle size={18} color="#475569" />
+            <Circle size={20} color="#475569" />
           )}
           <Text
             style={[
               styles.taskTitle,
+              fontStyle,
               item.isCompleted && styles.completedTaskTitle,
             ]}
             numberOfLines={1}
@@ -204,7 +209,7 @@ export function TaskListCard({
           activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Eye size={15} color="#64748b" />
+          <Eye size={16} color="#64748b" />
         </TouchableOpacity>
       </View>
     );
@@ -227,17 +232,22 @@ export function TaskListCard({
         ListHeaderComponent={
           <View pointerEvents="box-none">
             {ListHeaderComponent}
-            <View style={styles.cardHeader}>
+            <LinearGradient
+              colors={['#111729', '#1E1B4B']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cardHeader}
+            >
               <View style={styles.titleGroup}>
                 <NotebookPen size={16} color="#3b82f6" />
-                <Text style={styles.cardTitle}>Priority Scratchpad</Text>
+                <Text style={[styles.cardTitle, fontStyle]}>Priority Scratchpad</Text>
               </View>
               {tasks.length > 0 && (
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{tasks.length}</Text>
+                  <Text style={[styles.badgeText, fontStyle]}>{tasks.length}</Text>
                 </View>
               )}
-            </View>
+            </LinearGradient>
           </View>
         }
         ListEmptyComponent={
@@ -247,7 +257,9 @@ export function TaskListCard({
             </View>
           ) : (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>✨ Notepad empty! Clear schedule ahead.</Text>
+              <Text style={[styles.emptyText, fontStyle]}>
+                ✨ Notepad empty! Clear schedule ahead.
+              </Text>
             </View>
           )
         }
@@ -255,12 +267,19 @@ export function TaskListCard({
           <View pointerEvents="box-none">
             {!loading && tasks.length > 0 && (
               <TouchableOpacity
-                style={styles.footerButton}
                 onPress={handleNavigateToTasks}
                 activeOpacity={0.7}
+                style={styles.footerTouchable}
               >
-                <Text style={styles.footerText}>View All Tasks</Text>
-                <ArrowRight size={14} color="#3b82f6" />
+                <LinearGradient
+                  colors={['#111729', '#1E1B4B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.footerButton}
+                >
+                  <Text style={[styles.footerText, fontStyle]}>View All Tasks</Text>
+                  <ArrowRight size={14} color="#3b82f6" />
+                </LinearGradient>
               </TouchableOpacity>
             )}
             {ListFooterComponent}
@@ -293,11 +312,9 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   cardHeader: {
-    backgroundColor: '#111729',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderWidth: 1,
-    borderBottomWidth: 1,
     borderColor: '#1e293b',
     flexDirection: 'row',
     alignItems: 'center',
@@ -335,7 +352,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
   },
   taskRowBorder: {
     borderBottomWidth: 1,
@@ -345,11 +362,11 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
     paddingRight: 12,
   },
   taskTitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#cbd5e1',
     fontWeight: '400',
   },
@@ -376,8 +393,12 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontWeight: '500',
   },
+  footerTouchable: {
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    overflow: 'hidden',
+  },
   footerButton: {
-    backgroundColor: '#111729',
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderBottomWidth: 1,

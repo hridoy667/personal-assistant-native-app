@@ -1,7 +1,6 @@
-// components/TaskItem.tsx
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation } from 'react-native';
-import { CheckCircle2, Circle, ChevronDown, ChevronUp, Trash2, Edit3, Calendar } from 'lucide-react-native';
+import { CheckCircle2, Circle, ChevronDown, ChevronUp, Trash2, Edit3, Calendar, Tag, Zap } from 'lucide-react-native';
 import { Task, TaskPriority } from '../types/task';
 
 export const PRIORITY_LABELS: Record<TaskPriority, string> = {
@@ -31,12 +30,12 @@ const formatDueDate = (dateString?: string | null): string => {
 
   const timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
 
-  if (diffDays === 0) return `Today at ${timeStr}`;
-  if (diffDays === 1) return `Tomorrow at ${timeStr}`;
-  if (diffDays === -1) return `Missed yesterday at ${timeStr}`;
+  if (diffDays === 0) return `Today, ${timeStr}`;
+  if (diffDays === 1) return `Tomorrow, ${timeStr}`;
+  if (diffDays === -1) return `Yesterday, ${timeStr}`;
 
-  const dayStr = date.toLocaleDateString([], { day: 'numeric', month: 'long' });
-  return `${dayStr} ${timeStr}`;
+  const dayStr = date.toLocaleDateString([], { day: 'numeric', month: 'short' });
+  return `${dayStr}, ${timeStr}`;
 };
 
 interface TaskItemProps {
@@ -50,7 +49,6 @@ export const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onDelete, on
   const [expanded, setExpanded] = useState(false);
 
   const toggleExpand = () => {
-    // Safely trigger LayoutAnimation if supported, avoiding the deprecated experimental call
     if (LayoutAnimation.configureNext) {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
@@ -61,113 +59,150 @@ export const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onDelete, on
     switch (priority) {
       case TaskPriority.P1_URGENT: return '#EF4444';
       case TaskPriority.P2_HIGH: return '#F59E0B';
-      case TaskPriority.P3_MEDIUM: return '#3B82F6';
-      case TaskPriority.P4_LOW: return '#94A3B8';
-      default: return '#94A3B8';
+      case TaskPriority.P3_MEDIUM: return '#6366F1';
+      case TaskPriority.P4_LOW: return '#64748B';
+      default: return '#64748B';
     }
   };
 
+  const priorityColor = getPriorityColor(task.priority);
+
   return (
     <View style={[styles.card, task.isCompleted && styles.completedCard]}>
-      <View style={styles.mainRow}>
-        <TouchableOpacity onPress={() => onToggle(task.id)} style={styles.checkboxContainer}>
-          {task.isCompleted ? (
-            <CheckCircle2 color="#10B981" size={22} />
-          ) : (
-            <Circle color="#64748B" size={22} />
-          )}
-        </TouchableOpacity>
+      {/* Priority Color Accent Strip */}
+      <View style={[styles.priorityIndicator, { backgroundColor: task.isCompleted ? '#334155' : priorityColor }]} />
 
-        <TouchableOpacity onPress={toggleExpand} style={styles.titleContainer} activeOpacity={0.8}>
-          <Text style={[styles.taskTitle, task.isCompleted && styles.completedText]} numberOfLines={1}>
-            {task.title}
-          </Text>
-          <View style={styles.badgeRow}>
-            <View style={[styles.priorityBadge, { borderColor: getPriorityColor(task.priority) }]}>
-              <Text style={[styles.priorityText, { color: getPriorityColor(task.priority) }]}>
-                {PRIORITY_LABELS[task.priority] || 'Medium'}
-              </Text>
-            </View>
+      <View style={styles.cardContent}>
+        {/* Header Row */}
+        <View style={styles.mainRow}>
+          <TouchableOpacity 
+            onPress={() => onToggle(task.id)} 
+            style={styles.checkboxContainer}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            {task.isCompleted ? (
+              <CheckCircle2 color="#10B981" size={22} />
+            ) : (
+              <Circle color="#475569" size={22} />
+            )}
+          </TouchableOpacity>
 
-            {task.category ? (
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryText}>{task.category}</Text>
-              </View>
-            ) : null}
+          <TouchableOpacity onPress={toggleExpand} style={styles.titleContainer} activeOpacity={0.8}>
+            <Text style={[styles.taskTitle, task.isCompleted && styles.completedText]} numberOfLines={1}>
+              {task.title}
+            </Text>
 
-            {task.energyRequired ? (
-              <View style={styles.energyBadge}>
-                <Text style={styles.energyText}>
-                  {ENERGY_LABELS[task.energyRequired] || task.energyRequired}
+            {/* Badges Row */}
+            <View style={styles.badgeRow}>
+              <View style={[styles.badge, { backgroundColor: `${priorityColor}15` }]}>
+                <View style={[styles.badgeDot, { backgroundColor: priorityColor }]} />
+                <Text style={[styles.badgeText, { color: priorityColor }]}>
+                  {PRIORITY_LABELS[task.priority] || 'Medium'}
                 </Text>
               </View>
-            ) : null}
-          </View>
-        </TouchableOpacity>
 
-        <TouchableOpacity onPress={toggleExpand} style={styles.expandButton}>
-          {expanded ? <ChevronUp color="#94A3B8" size={18} /> : <ChevronDown color="#94A3B8" size={18} />}
-        </TouchableOpacity>
-      </View>
+              {task.category ? (
+                <View style={styles.badge}>
+                  <Text style={styles.categoryText}>{task.category}</Text>
+                </View>
+              ) : null}
 
-      {expanded && (
-        <View style={styles.expandedContent}>
-          {Boolean(task.description) && (
-            <Text style={styles.descriptionText}>{task.description}</Text>
-          )}
-
-          <View style={styles.metaRow}>
-            {task.dueDate ? (
-              <View style={styles.metaItem}>
-                <Calendar size={14} color="#3B82F6" />
-                <Text style={styles.metaText}>{formatDueDate(task.dueDate)}</Text>
-              </View>
-            ) : null}
-          </View>
-
-          {task.tags && task.tags.length > 0 && (
-            <View style={styles.tagsRow}>
-              {task.tags.map((tag, idx) => (
-                <Text key={idx} style={styles.tagText}>#{tag}</Text>
-              ))}
+              {task.energyRequired ? (
+                <View style={[styles.badge, styles.energyBadge]}>
+                  <Zap size={10} color="#818CF8" style={styles.badgeIcon} />
+                  <Text style={styles.energyText}>
+                    {ENERGY_LABELS[task.energyRequired] || task.energyRequired}
+                  </Text>
+                </View>
+              ) : null}
             </View>
-          )}
+          </TouchableOpacity>
 
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => onEdit(task)}>
-              <Edit3 size={14} color="#6366F1" />
-              <Text style={[styles.actionText, { color: '#6366F1' }]}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete(task.id)}>
-              <Trash2 size={14} color="#EF4444" />
-              <Text style={[styles.actionText, { color: '#EF4444' }]}>Delete</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={toggleExpand} style={styles.expandButton}>
+            {expanded ? <ChevronUp color="#64748B" size={18} /> : <ChevronDown color="#64748B" size={18} />}
+          </TouchableOpacity>
         </View>
-      )}
+
+        {/* Expanded Drawer */}
+        {expanded && (
+          <View style={styles.expandedContent}>
+            {Boolean(task.description) && (
+              <Text style={styles.descriptionText}>{task.description}</Text>
+            )}
+
+            <View style={styles.metaRow}>
+              {task.dueDate ? (
+                <View style={styles.metaItem}>
+                  <Calendar size={13} color="#6366F1" />
+                  <Text style={styles.metaText}>{formatDueDate(task.dueDate)}</Text>
+                </View>
+              ) : null}
+
+              {task.tags && task.tags.length > 0 && (
+                <View style={styles.metaItem}>
+                  <Tag size={13} color="#818CF8" />
+                  <Text style={styles.tagsText}>
+                    {task.tags.map(t => `#${t}`).join(' ')}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Actions Bar */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity 
+                style={[styles.actionBtn, styles.editBtn]} 
+                onPress={() => onEdit(task)}
+                activeOpacity={0.7}
+              >
+                <Edit3 size={13} color="#818CF8" />
+                <Text style={styles.editText}>Edit Task</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.actionBtn, styles.deleteBtn]} 
+                onPress={() => onDelete(task.id)}
+                activeOpacity={0.7}
+              >
+                <Trash2 size={13} color="#EF4444" />
+                <Text style={styles.deleteText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: '#151C2C',
+    borderRadius: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#1E293B',
+    flexDirection: 'row',
+    overflow: 'hidden',
   },
   completedCard: {
-    backgroundColor: '#1E293B88',
-    borderColor: '#2b394f',
+    opacity: 0.65,
+    borderColor: '#1E293B55',
+  },
+  priorityIndicator: {
+    width: 4,
+    height: '100%',
+  },
+  cardContent: {
+    flex: 1,
+    padding: 12,
   },
   mainRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   checkboxContainer: {
-    marginRight: 10,
+    marginRight: 12,
   },
   titleContainer: {
     flex: 1,
@@ -175,8 +210,8 @@ const styles = StyleSheet.create({
   taskTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    color: '#F8FAFC',
+    marginBottom: 6,
   },
   completedText: {
     textDecorationLine: 'line-through',
@@ -186,90 +221,111 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     flexWrap: 'wrap',
+    alignItems: 'center',
   },
-  priorityBadge: {
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
-  priorityText: {
+  badgeDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    marginRight: 5,
+  },
+  badgeIcon: {
+    marginRight: 3,
+  },
+  badgeText: {
     fontSize: 10,
-    fontWeight: '600',
-  },
-  categoryBadge: {
-    backgroundColor: '#334155',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+    fontWeight: '700',
   },
   categoryText: {
     fontSize: 10,
-    color: '#CBD5E1',
-    fontWeight: '500',
+    color: '#94A3B8',
+    fontWeight: '600',
   },
   energyBadge: {
-    backgroundColor: '#312E81',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+    backgroundColor: '#312E8140',
   },
   energyText: {
     fontSize: 10,
     color: '#818CF8',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   expandButton: {
-    padding: 4,
+    padding: 6,
+    marginLeft: 4,
   },
+
+  // Expanded Content
   expandedContent: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#334155',
+    borderTopColor: '#1E293B',
   },
   descriptionText: {
     fontSize: 13,
     color: '#CBD5E1',
-    marginBottom: 12,
+    marginBottom: 10,
     lineHeight: 18,
   },
   metaRow: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 8,
+    flexWrap: 'wrap',
+    gap: 14,
+    marginBottom: 12,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   metaText: {
     fontSize: 12,
     color: '#94A3B8',
+    fontWeight: '500',
   },
-  tagsRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 8,
-  },
-  tagText: {
+  tagsText: {
     fontSize: 11,
     color: '#818CF8',
+    fontWeight: '500',
   },
+
+  // Actions
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 16,
-    marginTop: 4,
+    gap: 8,
+    marginTop: 2,
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '500',
+  editBtn: {
+    backgroundColor: '#312E8140',
+  },
+  deleteBtn: {
+    backgroundColor: '#EF444415',
+  },
+  editText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#818CF8',
+  },
+  deleteText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#EF4444',
   },
 });

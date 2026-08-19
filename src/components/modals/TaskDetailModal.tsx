@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   CheckCircle2,
   Circle,
@@ -16,6 +17,7 @@ import {
   Calendar,
   Zap,
   AlertCircle,
+  Folder,
 } from 'lucide-react-native';
 import { CreateTaskPayload, Task, TaskPriority } from '@/types/task';
 
@@ -36,6 +38,16 @@ interface TaskDetailModalProps {
   };
 }
 
+// Clean helper to produce human-readable strings like "Medium Priority"
+const formatPriorityText = (priority?: TaskPriority, defaultLabel?: string): string => {
+  if (!priority) return defaultLabel ? `${defaultLabel} Priority` : 'Normal Priority';
+  
+  const rawStr = String(priority).replace(/^P[1-4]:?\s*/i, '').replace(/_/g, ' ').trim();
+  const capitalized = rawStr.charAt(0).toUpperCase() + rawStr.slice(1).toLowerCase();
+  
+  return `${capitalized} Priority`;
+};
+
 export function TaskDetailModal({
   visible,
   task,
@@ -43,10 +55,11 @@ export function TaskDetailModal({
   error,
   onClose,
   onToggle,
-  onDelete,
-  onUpdate,
   getPriorityConfig,
 }: TaskDetailModalProps) {
+  const priorityConfig = task?.priority ? getPriorityConfig(task.priority) : null;
+  const priorityText = formatPriorityText(task?.priority, priorityConfig?.label);
+
   return (
     <Modal
       visible={visible}
@@ -56,96 +69,102 @@ export function TaskDetailModal({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          {/* Modal Header */}
+          {/* Minimalist Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalHeaderTitle}>Task Details</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={18} color="#94a3b8" />
+            <TouchableOpacity onPress={onClose} style={styles.closeButton} activeOpacity={0.7}>
+              <X size={18} color="#94A3B8" />
             </TouchableOpacity>
           </View>
 
-          {/* Modal Body */}
+          {/* Modal Content */}
           {loading ? (
-            <View style={styles.modalLoadingContainer}>
-              <ActivityIndicator size="large" color="#60a5fa" />
-              <Text style={styles.loadingText}>Fetching details...</Text>
+            <View style={styles.stateContainer}>
+              <ActivityIndicator size="small" color="#6366F1" />
+              <Text style={styles.stateText}>Loading task...</Text>
             </View>
           ) : error ? (
-            <View style={styles.modalErrorContainer}>
-              <AlertCircle size={24} color="#f87171" />
+            <View style={styles.stateContainer}>
+              <AlertCircle size={24} color="#F87171" />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : task ? (
             <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-              {/* Title and Toggle */}
+              
+              {/* Title Header with Completion Toggle */}
               <TouchableOpacity
-                style={styles.modalStatusRow}
+                style={styles.titleRow}
                 onPress={() => onToggle(task.id)}
                 activeOpacity={0.7}
               >
                 {task.isCompleted ? (
-                  <CheckCircle2 size={20} color="#34d399" />
+                  <CheckCircle2 size={22} color="#10B981" />
                 ) : (
-                  <Circle size={20} color="#475569" />
+                  <Circle size={22} color="#475569" />
                 )}
                 <Text
                   style={[
-                    styles.modalTaskTitle,
-                    task.isCompleted && styles.completedTaskTitle,
+                    styles.taskTitle,
+                    task.isCompleted && styles.completedTitle,
                   ]}
                 >
                   {task.title}
                 </Text>
               </TouchableOpacity>
 
-              {/* Priority Chip */}
-              {task.priority && (
-                <View style={styles.priorityChipContainer}>
+              {/* Priority & Energy Badges Row */}
+              <View style={styles.badgesRow}>
+                {task.priority && priorityConfig ? (
                   <View
                     style={[
-                      styles.priorityChip,
-                      {
-                        backgroundColor: getPriorityConfig(task.priority).badgeBg,
-                      },
+                      styles.priorityBadge,
+                      { backgroundColor: priorityConfig.badgeBg },
                     ]}
                   >
+                    <View
+                      style={[
+                        styles.priorityDot,
+                        { backgroundColor: priorityConfig.badgeText },
+                      ]}
+                    />
                     <Text
                       style={[
-                        styles.priorityChipText,
-                        {
-                          color: getPriorityConfig(task.priority).badgeText,
-                        },
+                        styles.priorityText,
+                        { color: priorityConfig.badgeText },
                       ]}
                     >
-                      {getPriorityConfig(task.priority).label}
+                      {priorityText}
                     </Text>
                   </View>
-                </View>
-              )}
+                ) : null}
 
-              {/* Metadata Card */}
-              <View style={styles.metaContainer}>
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaLabel}>Energy Level</Text>
-                  <View style={styles.iconMetaRow}>
-                    <Zap size={14} color="#fbbf24" />
-                    <Text style={styles.metaValue}>{task.energyRequired}</Text>
-                  </View>
-                </View>
-
-                {task.category && (
-                  <View style={styles.metaItem}>
-                    <Text style={styles.metaLabel}>Category</Text>
-                    <Text style={styles.metaValue}>{task.category}</Text>
+                {task.energyRequired !== undefined && (
+                  <View style={styles.energyBadge}>
+                    <Zap size={12} color="#F59E0B" />
+                    <Text style={styles.energyText}>
+                      Energy {task.energyRequired}
+                    </Text>
                   </View>
                 )}
+              </View>
 
-                {task.dueDate && (
-                  <View style={styles.metaItem}>
-                    <Text style={styles.metaLabel}>Due Date</Text>
-                    <View style={styles.iconMetaRow}>
-                      <Calendar size={14} color="#60a5fa" />
-                      <Text style={styles.metaValue}>
+              {/* Description Section */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>DESCRIPTION</Text>
+                <Text style={styles.descriptionText}>
+                  {task.description && task.description.trim().length > 0
+                    ? task.description
+                    : 'No description provided.'}
+                </Text>
+              </View>
+
+              {/* Due Date & Category Inline Row */}
+              {(task.dueDate || task.category) && (
+                <View style={styles.metaRow}>
+                  {task.dueDate ? (
+                    <View style={styles.metaItem}>
+                      <Calendar size={14} color="#6366F1" />
+                      <Text style={styles.metaText}>
                         {new Date(task.dueDate).toLocaleDateString(undefined, {
                           month: 'short',
                           day: 'numeric',
@@ -153,35 +172,50 @@ export function TaskDetailModal({
                         })}
                       </Text>
                     </View>
-                  </View>
-                )}
-              </View>
+                  ) : null}
+
+                  {task.category ? (
+                    <View style={styles.metaItem}>
+                      <Folder size={14} color="#6366F1" />
+                      <Text style={styles.metaText}>{task.category}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              )}
 
               {/* Tags Section */}
               {task.tags && task.tags.length > 0 && (
-                <View style={styles.tagsSection}>
-                  <Text style={styles.metaLabel}>Tags</Text>
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>TAGS</Text>
                   <View style={styles.tagsRow}>
                     {task.tags.map((tag, idx) => (
                       <View key={idx} style={styles.tagChip}>
-                        <Tag size={12} color="#60a5fa" />
+                        <Tag size={10} color="#818CF8" />
                         <Text style={styles.tagText}>{tag}</Text>
                       </View>
                     ))}
                   </View>
                 </View>
               )}
+
             </ScrollView>
           ) : null}
 
-          {/* Modal Footer */}
+          {/* Clean Action Footer */}
           <View style={styles.modalFooter}>
             <TouchableOpacity
-              style={styles.dismissButton}
+              style={styles.doneBtn}
               onPress={onClose}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
-              <Text style={styles.dismissButtonText}>Done</Text>
+              <LinearGradient
+                colors={['#6366F1', '#4F46E5']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.doneGradient}
+              >
+                <Text style={styles.doneText}>Done</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
@@ -193,7 +227,7 @@ export function TaskDetailModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(11, 15, 25, 0.85)',
+    backgroundColor: 'rgba(11, 15, 23, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -201,10 +235,10 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxHeight: '80%',
-    backgroundColor: '#111729',
-    borderRadius: 20,
+    backgroundColor: '#151C2C',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: '#1E293B',
     overflow: 'hidden',
   },
   modalHeader: {
@@ -212,149 +246,170 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    paddingTop: 18,
+    paddingBottom: 12,
   },
   modalHeaderTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#F8FAFC',
   },
   closeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#1e293b',
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 4,
   },
   modalContent: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
   },
-  modalLoadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 13,
-    color: '#94a3b8',
-    fontWeight: '500',
-  },
-  modalErrorContainer: {
+  stateContainer: {
     padding: 30,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    gap: 10,
+  },
+  stateText: {
+    fontSize: 13,
+    color: '#94A3B8',
   },
   errorText: {
     fontSize: 13,
-    color: '#f87171',
-    textAlign: 'center',
-    fontWeight: '500',
+    color: '#F87171',
   },
-  modalStatusRow: {
+
+  // Title Row
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginVertical: 10,
+  },
+  taskTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#F8FAFC',
+    lineHeight: 24,
+  },
+  completedTitle: {
+    textDecorationLine: 'line-through',
+    color: '#64748B',
+  },
+
+  // Priority & Energy Badges
+  badgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 20,
   },
-  modalTaskTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#f8fafc',
-    lineHeight: 20,
-  },
-  completedTaskTitle: {
-    textDecorationLine: 'line-through',
-    color: '#64748b',
-    opacity: 0.6,
-  },
-  priorityChipContainer: {
+  priorityBadge: {
     flexDirection: 'row',
-    marginBottom: 16,
-  },
-  priorityChip: {
+    alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
   },
-  priorityChipText: {
+  priorityDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  priorityText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  energyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  energyText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F59E0B',
+  },
+
+  // Sections & Description
+  section: {
+    marginBottom: 18,
+  },
+  sectionLabel: {
     fontSize: 11,
     fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.8,
+    marginBottom: 6,
   },
-  metaContainer: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 14,
+  descriptionText: {
+    fontSize: 14,
+    color: '#CBD5E1',
+    lineHeight: 22,
+  },
+
+  // Meta Item Badges (Due Date & Category)
+  metaRow: {
+    flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
+    marginBottom: 18,
   },
   metaItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  metaLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
-  metaValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#e2e8f0',
-  },
-  iconMetaRow: {
-    flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    backgroundColor: '#0B0F17',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  tagsSection: {
-    marginBottom: 16,
+  metaText: {
+    fontSize: 13,
+    color: '#E2E8F0',
+    fontWeight: '500',
   },
+
+  // Tags
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 8,
   },
   tagChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(96, 165, 250, 0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    gap: 4,
+    backgroundColor: '#1E1B4B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   tagText: {
-    fontSize: 12,
-    color: '#60a5fa',
-    fontWeight: '600',
+    fontSize: 11,
+    color: '#A5B4FC',
+    fontWeight: '500',
   },
+
+  // Footer
   modalFooter: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
-    backgroundColor: '#111729',
+    borderTopColor: '#1E293B',
   },
-  dismissButton: {
-    backgroundColor: '#1e293b',
-    paddingVertical: 12,
+  doneBtn: {
     borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
+    overflow: 'hidden',
   },
-  dismissButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#f8fafc',
+  doneGradient: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  doneText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

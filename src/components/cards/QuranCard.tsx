@@ -6,6 +6,9 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BookOpen, Languages, RefreshCw, AlertCircle } from 'lucide-react-native';
+
 import { fetchDailyQuranAyat } from '@/services/quranApi';
 import { QuranAyatSuccessResponse } from '@/types/quran';
 
@@ -20,7 +23,7 @@ export const QuranCard: React.FC = () => {
     setErrorMsg(null);
     try {
       const data = await fetchDailyQuranAyat();
-      
+
       if ('surahName' in data) {
         setAyatData(data);
       } else {
@@ -40,7 +43,7 @@ export const QuranCard: React.FC = () => {
   if (loading) {
     return (
       <View style={[styles.card, styles.center]}>
-        <ActivityIndicator size="small" color="#10b981" />
+        <ActivityIndicator size="small" color="#10B981" />
         <Text style={styles.loadingText}>Loading Daily Verse...</Text>
       </View>
     );
@@ -49,8 +52,10 @@ export const QuranCard: React.FC = () => {
   if (errorMsg) {
     return (
       <View style={[styles.card, styles.center]}>
+        <AlertCircle color="#EF4444" size={24} style={styles.errorIcon} />
         <Text style={styles.errorText}>{errorMsg}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadAyat}>
+        <TouchableOpacity style={styles.retryButton} onPress={loadAyat} activeOpacity={0.8}>
+          <RefreshCw color="#FFFFFF" size={14} />
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -60,21 +65,31 @@ export const QuranCard: React.FC = () => {
   if (!ayatData) return null;
 
   return (
-    <View style={styles.card}>
+    <LinearGradient
+      colors={['#1E1B4B', '#0F172A']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.card}
+    >
+      {/* Accent Indicator Bar */}
+      <View style={styles.accentBar} />
+
       {/* Header Row */}
       <View style={styles.headerRow}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>📖 Daily Verse</Text>
+          <BookOpen color="#34D399" size={13} />
+          <Text style={styles.badgeText}>Daily Verse</Text>
         </View>
 
         {/* Translation Language Toggle Button */}
         <TouchableOpacity
           style={[styles.langButton, showBengali && styles.langButtonActive]}
           onPress={() => setShowBengali((prev) => !prev)}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
+          <Languages color={showBengali ? '#34D399' : '#94A3B8'} size={12} />
           <Text style={[styles.langText, showBengali && styles.langTextActive]}>
-            {showBengali ? 'EN' : 'BN'}
+            {showBengali ? 'BN' : 'EN'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -87,28 +102,37 @@ export const QuranCard: React.FC = () => {
       {/* Surah Reference Footer */}
       <View style={styles.footerRow}>
         <Text style={styles.referenceText}>
-          Surah {ayatData.surahName} ({ayatData.surahArabic}) • Verse {ayatData.verseKey}
+          Surah {ayatData.surahName} ({ayatData.surahArabic})
         </Text>
+        <Text style={styles.verseKeyText}>Verse {ayatData.verseKey}</Text>
       </View>
-    </View>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#111729',
+    position: 'relative',
     borderRadius: 16,
     padding: 16,
-    marginHorizontal: 1,
+    marginBottom: 1,
     borderWidth: 1,
-    borderColor: '#1e293b',
-    borderLeftWidth: 4,
-    borderLeftColor: '#10b981',
+    borderColor: '#1E293B',
+    overflow: 'hidden',
+  },
+  accentBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: '#10B981',
   },
   center: {
+    backgroundColor: '#151C2C',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 120,
+    minHeight: 140,
   },
   headerRow: {
     flexDirection: 'row',
@@ -117,74 +141,102 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.25)',
+    gap: 6,
   },
   badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#34d399',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#34D399',
+    letterSpacing: 0.5,
   },
   langButton: {
-    backgroundColor: '#1e293b',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
     borderColor: '#334155',
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderRadius: 20,
+    paddingHorizontal: 10,
     paddingVertical: 4,
+    gap: 4,
   },
   langButtonActive: {
-    backgroundColor: '#059669',
-    borderColor: '#10b981',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: '#10B981',
   },
   langText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: '#94A3B8',
   },
   langTextActive: {
-    color: '#ffffff',
+    color: '#34D399',
   },
   translationText: {
     fontSize: 14,
-    color: '#e2e8f0',
+    color: '#F1F5F9',
     lineHeight: 22,
+    fontWeight: '400',
     fontStyle: 'italic',
+    marginVertical: 4,
   },
   footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: 14,
-    paddingTop: 10,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
   },
   referenceText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: '#94A3B8',
+  },
+  verseKeyText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6366F1',
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   loadingText: {
-    marginTop: 8,
+    marginTop: 10,
     fontSize: 13,
-    color: '#94a3b8',
+    color: '#94A3B8',
+  },
+  errorIcon: {
+    marginBottom: 8,
   },
   errorText: {
     fontSize: 13,
-    color: '#f87171',
+    color: '#F87171',
     textAlign: 'center',
+    paddingHorizontal: 16,
   },
   retryButton: {
-    marginTop: 10,
-    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 8,
     paddingHorizontal: 16,
     backgroundColor: '#059669',
-    borderRadius: 6,
+    borderRadius: 8,
   },
   retryText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
   },
