@@ -1,5 +1,5 @@
-import React from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogOut } from 'lucide-react-native';
 import { QuranCard } from '@/components/cards/QuranCard';
@@ -7,6 +7,11 @@ import { TaskListCard } from '@/components/cards/TaskListCard';
 import { WeatherCard } from '@/components/cards/WeatherCard';
 import { FloatingActionButton } from '@/components/common/FloatingActionButton';
 import { useAuth } from '@/context/AuthContext';
+import { 
+  checkAndRequestUsagePermission, 
+  isUsageStatsAvailable, 
+  syncDeviceScreenTime 
+} from '@/utils/screenTimeHelper';
 
 type HomeScreenSection = 
   | { id: 'weather' }
@@ -25,6 +30,41 @@ export default function HomeScreen() {
   const { logout } = useAuth();
   const insets = useSafeAreaInsets();
 
+  // Check availability first; check/request permission on initial load and sync if granted
+  useEffect(() => {
+    const initializeScreenTime = async () => {
+      if (!isUsageStatsAvailable()) {
+        return;
+      }
+
+      const granted = await checkAndRequestUsagePermission();
+      if (granted) {
+        await syncDeviceScreenTime();
+      }
+    };
+
+    initializeScreenTime();
+  }, []);
+
+  // Handler to manually check usage permissions and force a sync
+  const handleEnableScreenTime = async () => {
+    if (!isUsageStatsAvailable()) {
+      Alert.alert(
+        'Not Supported', 
+        'Screen time tracking requires a custom native build and is unavailable in Expo Go.'
+      );
+      return;
+    }
+
+    const granted = await checkAndRequestUsagePermission();
+    if (granted) {
+      const synced = await syncDeviceScreenTime();
+      if (synced) {
+        Alert.alert('Success', 'Screen time synced successfully!');
+      }
+    }
+  };
+
   const renderSection = ({ item }: { item: HomeScreenSection }) => {
     switch (item.id) {
       case 'weather':
@@ -40,6 +80,14 @@ export default function HomeScreen() {
       case 'footer':
         return (
           <View style={styles.footer}>
+            <TouchableOpacity
+              style={styles.screenTimeButton}
+              onPress={handleEnableScreenTime}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.screenTimeText}>Enable Screen Time Tracking</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.logoutButton}
               onPress={logout}
@@ -64,7 +112,7 @@ export default function HomeScreen() {
         contentContainerStyle={[
           styles.listContent,
           { 
-            paddingTop: insets.top + 4, // Tighter inset so WeatherCard mounts directly under status bar
+            paddingTop: insets.top + 4,
             paddingBottom: insets.bottom + 95 
           }
         ]}
@@ -89,12 +137,30 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   topCardWrapper: {
-    marginTop: 4, // Subtle breathing room below native status bar
+    marginTop: 4,
   },
   footer: {
     alignItems: 'center',
     marginTop: 8,
     paddingBottom: 12,
+    gap: 10,
+  },
+  screenTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1e293b',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  screenTimeText: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '600',
   },
   logoutButton: {
     flexDirection: 'row',

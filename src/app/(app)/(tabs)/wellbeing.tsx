@@ -18,6 +18,7 @@ import { WellbeingData } from '@/types/health';
 import { getCachedLocation } from '@/lib/locationCache';
 import { ActivityLoggerModal } from '@/components/modals/ActivityLoggerModal';
 import { MoodLoggerModal } from '@/components/modals/MoodLoggerModal';
+import { ScreenTimeCard } from '@/components/cards/ScreenTimeCard';
 
 export default function WellbeingScreen() {
   const router = useRouter();
@@ -218,6 +219,11 @@ export default function WellbeingScreen() {
           ) : null}
         </LinearGradient>
 
+        {/* Screen Time Tracker */}
+        <View style={styles.cardWrapper}>
+          <ScreenTimeCard />
+        </View>
+
         {/* Hydration Tracker */}
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
@@ -379,6 +385,10 @@ const styles = StyleSheet.create({
   energyValue: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
   unit: { fontSize: 12, color: '#94A3B8', fontWeight: '400' },
   tdeeNote: { fontSize: 12, color: '#C7D2FE', marginTop: 12 },
+  
+  cardWrapper: {
+    marginBottom: 16,
+  },
   card: { backgroundColor: '#151C2C', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#1E293B' },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   cardIcon: { fontSize: 18, marginRight: 8 },
