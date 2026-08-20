@@ -1,6 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+// Set your active localtunnel URL here
+const LOCAL_TUNNEL_URL = 'https://chilly-hornets-take.loca.lt/api';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || LOCAL_TUNNEL_URL;
+
+console.log('[API Client] Initialized with Base URL:', API_BASE_URL);
 
 // Token Storage Keys
 const ACCESS_TOKEN_KEY = 'auth_access_token';
@@ -12,13 +17,11 @@ export const tokenStorage = {
   getRefreshToken: async () => await SecureStore.getItemAsync(REFRESH_TOKEN_KEY),
   getUserType: async () => await SecureStore.getItemAsync(USER_TYPE_KEY),
 
-  // Original setTokens method expected by apiClient / refreshAccessToken
   setTokens: async (accessToken: string, refreshToken: string) => {
     await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
     await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
   },
 
-  // Extended method to store user type along with tokens
   setAuthData: async (accessToken: string, refreshToken: string, userType?: string) => {
     await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
     await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
@@ -38,9 +41,6 @@ interface RequestOptions extends RequestInit {
   requiresAuth?: boolean;
 }
 
-// Helper: NestJS ValidationPipe (and some custom exceptions) return
-// `message` as a string[] instead of a string. Normalize to a single string
-// so callers always get a clean, displayable message.
 function extractErrorMessage(responseData: any, status: number): string {
   const raw = responseData?.message;
   if (Array.isArray(raw) && raw.length > 0) {
@@ -52,9 +52,6 @@ function extractErrorMessage(responseData: any, status: number): string {
   return `Request failed with status ${status}`;
 }
 
-// De-dupe concurrent refresh attempts: if multiple requests 401 around the
-// same time, they all share one in-flight refresh instead of each calling
-// /auth/refresh separately (which can race and invalidate rotating tokens).
 let refreshInFlight: Promise<boolean> | null = null;
 
 function getOrStartRefresh(): Promise<boolean> {
@@ -76,15 +73,15 @@ export async function apiClient<T>(
   const { requiresAuth = true, headers, body, ...restOptions } = options;
 
   const reqHeaders: Record<string, string> = {
+    'Bypass-Tunnel-Reminder': 'true', // Bypasses localtunnel's splash warning page
+    'ngrok-skip-browser-warning': 'true', // Bypasses ngrok's warning page if used later
     ...(headers as Record<string, string>),
   };
 
-  // Do not set Content-Type if uploading FormData (multipart/form-data)
   if (!(body instanceof FormData) && !reqHeaders['Content-Type']) {
     reqHeaders['Content-Type'] = 'application/json';
   }
 
-  // Attach Access Token if authentication is required
   if (requiresAuth) {
     const accessToken = await tokenStorage.getAccessToken();
     if (accessToken) {
@@ -92,34 +89,36 @@ export async function apiClient<T>(
     }
   }
 
+  const targetUrl = `${API_BASE_URL}${endpoint}`;
   let response: Response;
+
   try {
-    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    response = await fetch(targetUrl, {
       ...restOptions,
       headers: reqHeaders,
       body,
     });
   } catch (networkError) {
-    // fetch itself threw (offline, DNS failure, server unreachable, etc.)
-    throw new Error('Unable to reach the server. Please check your connection and try again.');
+    console.error(`[API Network Error] Failed to fetch from: ${targetUrl}`, networkError);
+    throw new Error(`Unable to reach server at ${API_BASE_URL}. Check network connection.`);
   }
 
   // Handle Token Expiration (401 Unauthorized) -> Attempt Refresh
   if (response.status === 401 && requiresAuth) {
     const refreshed = await getOrStartRefresh();
     if (refreshed) {
-      // Retry the original request with the new access token
       const newAccessToken = await tokenStorage.getAccessToken();
       reqHeaders['Authorization'] = `Bearer ${newAccessToken}`;
 
       try {
-        response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        response = await fetch(targetUrl, {
           ...restOptions,
           headers: reqHeaders,
           body,
         });
       } catch (networkError) {
-        throw new Error('Unable to reach the server. Please check your connection and try again.');
+        console.error(`[API Network Error Retry] Failed to fetch from: ${targetUrl}`, networkError);
+        throw new Error('Unable to reach the server on retry. Check your connection.');
       }
     } else {
       await tokenStorage.clearTokens();
@@ -136,9 +135,6 @@ export async function apiClient<T>(
   return responseData as T;
 }
 
-/**
- * Internal helper to send the Refresh Token to your NestJS `/auth/refresh` endpoint
- */
 async function refreshAccessToken(): Promise<boolean> {
   try {
     const refreshToken = await tokenStorage.getRefreshToken();
@@ -146,7 +142,11 @@ async function refreshAccessToken(): Promise<boolean> {
 
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true',
+        'ngrok-skip-browser-warning': 'true',
+      },
       body: JSON.stringify({ refreshToken }),
     });
 
@@ -159,7 +159,8 @@ async function refreshAccessToken(): Promise<boolean> {
     }
 
     return false;
-  } catch {
+  } catch (err) {
+    console.error('[Token Refresh Error]', err);
     return false;
   }
 }
