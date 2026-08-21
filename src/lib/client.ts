@@ -1,9 +1,12 @@
 import * as SecureStore from 'expo-secure-store';
 
-// Set your active localtunnel URL here
-const LOCAL_TUNNEL_URL = 'https://chilly-hornets-take.loca.lt/api';
+// Define the root tunnel host without /api attached
+const LOCAL_TUNNEL_URL = 'http://192.168.1.3:5000/api';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || LOCAL_TUNNEL_URL;
+// Strip trailing slash if present
+const RAW_BASE = (process.env.EXPO_PUBLIC_API_URL || LOCAL_TUNNEL_URL).replace(/\/$/, '');
+// Ensure base ends with /api
+const API_BASE_URL = RAW_BASE.endsWith('/api') ? RAW_BASE : `${RAW_BASE}/api`;
 
 console.log('[API Client] Initialized with Base URL:', API_BASE_URL);
 
@@ -70,11 +73,20 @@ export async function apiClient<T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { requiresAuth = true, headers, body, ...restOptions } = options;
+  const { requiresAuth = true, headers, body, method = 'GET', ...restOptions } = options;
+
+  // Format path endpoint
+  const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  // Prevent duplicate /api/api occurrences
+  const cleanEndpoint = formattedEndpoint.startsWith('/api/')
+    ? formattedEndpoint.replace('/api', '')
+    : formattedEndpoint;
+
+  const targetUrl = `${API_BASE_URL}${cleanEndpoint}`;
 
   const reqHeaders: Record<string, string> = {
-    'Bypass-Tunnel-Reminder': 'true', // Bypasses localtunnel's splash warning page
-    'ngrok-skip-browser-warning': 'true', // Bypasses ngrok's warning page if used later
+    'Bypass-Tunnel-Reminder': 'true',
+    'ngrok-skip-browser-warning': 'true',
     ...(headers as Record<string, string>),
   };
 
@@ -89,11 +101,14 @@ export async function apiClient<T>(
     }
   }
 
-  const targetUrl = `${API_BASE_URL}${endpoint}`;
+  // LOG OUTGOING REQUEST
+  console.log(`[API Request] ${method} -> ${targetUrl}`);
+
   let response: Response;
 
   try {
     response = await fetch(targetUrl, {
+      method,
       ...restOptions,
       headers: reqHeaders,
       body,
@@ -103,8 +118,11 @@ export async function apiClient<T>(
     throw new Error(`Unable to reach server at ${API_BASE_URL}. Check network connection.`);
   }
 
+  console.log(`[API Response Status] ${response.status} from ${targetUrl}`);
+
   // Handle Token Expiration (401 Unauthorized) -> Attempt Refresh
   if (response.status === 401 && requiresAuth) {
+    console.log('[API Auth] 401 Received. Attempting token refresh...');
     const refreshed = await getOrStartRefresh();
     if (refreshed) {
       const newAccessToken = await tokenStorage.getAccessToken();
@@ -112,6 +130,7 @@ export async function apiClient<T>(
 
       try {
         response = await fetch(targetUrl, {
+          method,
           ...restOptions,
           headers: reqHeaders,
           body,
@@ -126,10 +145,19 @@ export async function apiClient<T>(
     }
   }
 
-  const responseData = await response.json().catch(() => ({}));
+  const rawText = await response.text();
+  let responseData: any = {};
+
+  try {
+    responseData = JSON.parse(rawText);
+  } catch {
+    console.warn('[API Client] Non-JSON Response received:', rawText.slice(0, 150));
+  }
 
   if (!response.ok) {
-    throw new Error(extractErrorMessage(responseData, response.status));
+    const errorMsg = extractErrorMessage(responseData, response.status);
+    console.error(`[API Error] ${response.status}:`, errorMsg);
+    throw new Error(errorMsg);
   }
 
   return responseData as T;

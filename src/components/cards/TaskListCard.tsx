@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { taskService } from '@/services/task.service';
 import { Task, TaskPriority, CreateTaskPayload } from '@/types/task';
 import { TaskDetailModal } from '../modals/TaskDetailModal';
+import { eventBus } from '@/utils/eventBus'; // 👈 Import eventBus
 
 interface TaskListCardProps {
   ListHeaderComponent?: React.ReactElement;
@@ -60,11 +61,23 @@ export function TaskListCard({
     }
   };
 
+  // Reload when the tab/screen gains focus
   useFocusEffect(
     useCallback(() => {
       loadInitialTasks();
     }, [])
   );
+
+  // 👈 Subscribe to global task creation events
+  useEffect(() => {
+    const unsubscribe = eventBus.on('TASK_CREATED', () => {
+      loadInitialTasks();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const handleToggle = async (id: string) => {
     setTasks((prev) =>

@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/client";
-import { WellbeingResponse, UpsertHealthLogDto, MoodLogResponse, CreateActivityLogDto, ActivityLogResponse } from '@/types/health';
+import { WellbeingResponse, CreateMoodLogDto, MoodLogResponse, CreateActivityLogDto, ActivityLogResponse } from '@/types/health';
 
 export const WellbeingApiService = {
   /**
@@ -20,19 +20,19 @@ export const WellbeingApiService = {
   /**
    * Upsert daily health metrics (sleep, water intake, weight)
    */
-  async upsertHealthLog(dto: UpsertHealthLogDto): Promise<any> {
-    return apiClient('/health/log', {
-      method: 'POST',
-      body: JSON.stringify(dto),
-      requiresAuth: true,
-    });
-  },
+  // async upsertHealthLog(dto: UpsertHealthLogDto): Promise<any> {
+  //   return apiClient('/health/log', {
+  //     method: 'POST',
+  //     body: JSON.stringify(dto),
+  //     requiresAuth: true,
+  //   });
+  // },
 
   /**
    * Log a new time-series mood entry
    */
-  async createMoodLog(dto: UpsertHealthLogDto): Promise<MoodLogResponse> {
-    return apiClient<MoodLogResponse>('/health/mood', {
+  async createMoodLog(dto: CreateMoodLogDto): Promise<MoodLogResponse> {
+    return apiClient<MoodLogResponse>('/mood', {
       method: 'POST',
       body: JSON.stringify(dto),
       requiresAuth: true,

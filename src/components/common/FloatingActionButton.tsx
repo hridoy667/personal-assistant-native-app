@@ -1,89 +1,249 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  Animated,
+  ActivityIndicator,
 } from 'react-native';
-import { Plus, CheckSquare, Smile, DollarSign, X } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import {
+  Plus,
+  CheckSquare,
+  Smile,
+  DollarSign,
+  Activity,
+} from 'lucide-react-native';
+
+// Import Modals
+import { ActivityLoggerModal } from '../modals/ActivityLoggerModal';
+import { TaskFormModal } from '../modals/TaskFormModal';
+import { MoodLoggerModal } from '../modals/MoodLoggerModal';
+import { TransactionModal } from '../modals/TransactionModal';
+import { taskService } from '@/services/task.service';
+import { eventBus } from '@/utils/eventBus';
 
 export function FloatingActionButton() {
   const [isOpen, setIsOpen] = useState(false);
-  const router = useRouter();
+  const [submittingTask, setSubmittingTask] = useState(false);
+
+  // Modal Visibility States
+  const [activeModal, setActiveModal] = useState<
+    'activity' | 'task' | 'mood' | 'expense' | null
+  >(null);
+
+  // Animation Controller (0 = closed, 1 = open)
+  const animValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(animValue, {
+      toValue: isOpen ? 1 : 0,
+      friction: 6,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  }, [isOpen]);
 
   const toggleMenu = () => {
     setIsOpen((prev) => !prev);
   };
 
-  const handleAction = (route: string) => {
+  const openActionModal = (
+    modalType: 'activity' | 'task' | 'mood' | 'expense'
+  ) => {
     setIsOpen(false);
-    router.push(route as any);
+    setActiveModal(modalType);
+  };
+
+  const closeModal = () => {
+    setActiveModal(null);
+  };
+
+  // Interpolations for Animations
+  const backdropOpacity = animValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  const mainButtonRotation = animValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '135deg'],
+  });
+
+  const getOptionStyle = (index: number) => {
+    const translateY = animValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [20 * (index + 1), 0],
+    });
+
+    const scale = animValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+
+    const opacity = animValue.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0, 0.5, 1],
+    });
+
+    return {
+      opacity,
+      transform: [{ translateY }, { scale }],
+    };
+  };
+
+  // Handler for creating a task via service
+  const handleTaskSubmit = async (payload: any) => {
+    try {
+      setSubmittingTask(true);
+      await taskService.createTask(payload);
+      eventBus.emit('TASK_CREATED');
+      closeModal();
+    } catch (err) {
+      console.error('Failed to create task:', err);
+    } finally {
+      setSubmittingTask(false);
+    }
   };
 
   return (
     <>
-      {/* Dimmed backdrop to dismiss menu on tap */}
+      {/* Animated Backdrop */}
       {isOpen && (
-        <Pressable style={styles.backdrop} onPress={() => setIsOpen(false)} />
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={() => setIsOpen(false)}
+        >
+          <Animated.View
+            style={[styles.backdrop, { opacity: backdropOpacity }]}
+          />
+        </Pressable>
       )}
 
+      {/* Floating Action Button Container */}
       <View style={styles.container} pointerEvents="box-none">
-        {/* Expanded Options */}
         {isOpen && (
           <View style={styles.optionsContainer}>
-            {/* Add Task Option */}
-            <TouchableOpacity
-              style={styles.optionRow}
-              onPress={() => handleAction('/(app)/tasks/create')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.optionLabel}>Add Task</Text>
-              <View style={[styles.miniFab, { backgroundColor: '#3b82f6' }]}>
-                <CheckSquare size={18} color="#ffffff" />
-              </View>
-            </TouchableOpacity>
+            {/* 1. Log Activity Option */}
+            <Animated.View style={getOptionStyle(3)}>
+              <TouchableOpacity
+                style={styles.optionRow}
+                onPress={() => openActionModal('activity')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.optionLabel}>Log Activity</Text>
+                <View style={[styles.miniFab, { backgroundColor: '#8b5cf6' }]}>
+                  <Activity size={18} color="#ffffff" />
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
 
-            {/* Add Mood Option */}
-            <TouchableOpacity
-              style={styles.optionRow}
-              onPress={() => handleAction('/(app)/mood/create')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.optionLabel}>Add Mood</Text>
-              <View style={[styles.miniFab, { backgroundColor: '#f59e0b' }]}>
-                <Smile size={18} color="#ffffff" />
-              </View>
-            </TouchableOpacity>
+            {/* 2. Add Task Option */}
+            <Animated.View style={getOptionStyle(2)}>
+              <TouchableOpacity
+                style={styles.optionRow}
+                onPress={() => openActionModal('task')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.optionLabel}>Add Task</Text>
+                <View style={[styles.miniFab, { backgroundColor: '#3b82f6' }]}>
+                  <CheckSquare size={18} color="#ffffff" />
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
 
-            {/* Add Expense Option */}
-            <TouchableOpacity
-              style={styles.optionRow}
-              onPress={() => handleAction('/(app)/expense/create')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.optionLabel}>Add Expense</Text>
-              <View style={[styles.miniFab, { backgroundColor: '#10b981' }]}>
-                <DollarSign size={18} color="#ffffff" />
-              </View>
-            </TouchableOpacity>
+            {/* 3. Add Mood Option */}
+            <Animated.View style={getOptionStyle(1)}>
+              <TouchableOpacity
+                style={styles.optionRow}
+                onPress={() => openActionModal('mood')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.optionLabel}>Add Mood</Text>
+                <View style={[styles.miniFab, { backgroundColor: '#f59e0b' }]}>
+                  <Smile size={18} color="#ffffff" />
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* 4. Add Expense Option */}
+            <Animated.View style={getOptionStyle(0)}>
+              <TouchableOpacity
+                style={styles.optionRow}
+                onPress={() => openActionModal('expense')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.optionLabel}>Add Expense</Text>
+                <View style={[styles.miniFab, { backgroundColor: '#10b981' }]}>
+                  <DollarSign size={18} color="#ffffff" />
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
           </View>
         )}
 
         {/* Main Floating Trigger Button */}
         <TouchableOpacity
-          style={[styles.mainFab, isOpen && styles.mainFabActive]}
           onPress={toggleMenu}
           activeOpacity={0.85}
+          style={styles.mainFabWrapper}
         >
-          {isOpen ? (
-            <X size={24} color="#ffffff" />
-          ) : (
-            <Plus size={24} color="#ffffff" />
-          )}
+          <Animated.View
+            style={[
+              styles.mainFab,
+              isOpen && styles.mainFabActive,
+              { transform: [{ rotate: mainButtonRotation }] },
+            ]}
+          >
+            {submittingTask ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Plus size={24} color="#ffffff" />
+            )}
+          </Animated.View>
         </TouchableOpacity>
       </View>
+
+      {/* --- Action Modals --- */}
+      <ActivityLoggerModal
+        visible={activeModal === 'activity'}
+        onClose={closeModal}
+        onSuccess={() => {
+          eventBus.emit('ACTIVITY_CREATED');
+          closeModal();
+        }}
+      />
+
+      <TaskFormModal
+        visible={activeModal === 'task'}
+        onClose={closeModal}
+        onSubmit={handleTaskSubmit}
+        onSuccess={() => {
+          // Triggered if TaskFormModal handles API calls internally
+          eventBus.emit('TASK_CREATED');
+          closeModal();
+        }}
+      />
+
+      <MoodLoggerModal
+        visible={activeModal === 'mood'}
+        onClose={closeModal}
+        onSuccess={() => {
+          eventBus.emit('MOOD_CREATED');
+          closeModal();
+        }}
+      />
+
+      <TransactionModal
+        visible={activeModal === 'expense'}
+        onClose={closeModal}
+        onSuccess={() => {
+          eventBus.emit('TRANSACTION_CREATED'); // 👈 Fixed: Emits event for real-time list update
+          closeModal();
+        }}
+        defaultIsExpense={true}
+      />
     </>
   );
 }
@@ -133,6 +293,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+  },
+  mainFabWrapper: {
+    borderRadius: 28,
   },
   mainFab: {
     width: 56,

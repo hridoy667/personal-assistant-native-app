@@ -23,6 +23,7 @@ interface TaskFormModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (payload: CreateTaskPayload) => Promise<void>;
+  onSuccess?: () => void;
   initialTask?: Task | null;
 }
 

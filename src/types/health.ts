@@ -56,15 +56,10 @@ export interface WellbeingResponse {
   data?: WellbeingData;
 }
 
-export interface UpsertHealthLogDto {
+export interface CreateMoodLogDto {
   date?: string;
-  sleepHours?: number;
-  waterIntakeMl?: number;
-  weightKg?: number;
   mood?: MoodLevel;
   energyScore?: number;
-  contextTags?: string[];
-  symptoms?: string[];
   note?: string;
 }
 

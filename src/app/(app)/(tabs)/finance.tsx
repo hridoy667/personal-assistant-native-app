@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from 'expo-router'; // 👈 Added for tab focus updates
 
 import { transactionsApi, financePlanningApi } from '@/services/financeService';
 import {
@@ -25,6 +26,7 @@ import { SavingsGoalModal } from '@/components/modals/SavingsGoalModal';
 import { DepositModal } from '@/components/modals/DepositModal';
 import { EditTransactionModal } from '@/components/modals/EditTransactionModal';
 import { EditSavingsGoalModal } from '@/components/modals/EditSavingsGoalModal';
+import { eventBus } from '@/utils/eventBus'; // 👈 Imported event bus
 
 export default function FinanceScreen() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -70,8 +72,27 @@ export default function FinanceScreen() {
     }
   }, []);
 
+  // 1. Load/Refetch whenever screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchFinanceData();
+    }, [fetchFinanceData])
+  );
+
+  // 2. Real-time updates via EventBus (e.g. when added via FAB)
   useEffect(() => {
-    fetchFinanceData();
+    const unsubTransaction = eventBus.on('TRANSACTION_CREATED', () => {
+      fetchFinanceData();
+    });
+
+    const unsubActivity = eventBus.on('ACTIVITY_CREATED', () => {
+      fetchFinanceData();
+    });
+
+    return () => {
+      unsubTransaction();
+      unsubActivity();
+    };
   }, [fetchFinanceData]);
 
   const onRefresh = () => {
@@ -91,6 +112,7 @@ export default function FinanceScreen() {
             setDeletingTxId(id);
             await transactionsApi.delete(id);
             await fetchFinanceData();
+            eventBus.emit('TRANSACTION_CREATED'); // Notify other screens of state change
           } catch (err: any) {
             Alert.alert('Error', err.message || 'Failed to delete transaction');
           } finally {
@@ -361,14 +383,20 @@ export default function FinanceScreen() {
       <TransactionModal
         visible={showTransactionModal}
         onClose={() => setShowTransactionModal(false)}
-        onSuccess={fetchFinanceData}
+        onSuccess={() => {
+          fetchFinanceData();
+          eventBus.emit('TRANSACTION_CREATED');
+        }}
       />
 
       <EditTransactionModal
         visible={!!selectedTxForEdit}
         transaction={selectedTxForEdit}
         onClose={() => setSelectedTxForEdit(null)}
-        onSuccess={fetchFinanceData}
+        onSuccess={() => {
+          fetchFinanceData();
+          eventBus.emit('TRANSACTION_CREATED');
+        }}
       />
 
       <SavingsGoalModal
