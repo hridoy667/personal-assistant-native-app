@@ -12,6 +12,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import {
+  Plus,
+  Sparkles,
+  Lightbulb,
+  ArrowRight,
+  Activity,
+  Smile,
+  Zap,
+} from 'lucide-react-native';
 
 import { WellbeingApiService } from '@/services/wellbeing.service';
 import { WellbeingData } from '@/types/health';
@@ -20,9 +29,12 @@ import { ActivityLoggerModal } from '@/components/modals/ActivityLoggerModal';
 import { MoodLoggerModal } from '@/components/modals/MoodLoggerModal';
 import { ScreenTimeCard } from '@/components/cards/ScreenTimeCard';
 
+type WellbeingMainTab = 'activity' | 'mood';
+
 export default function WellbeingScreen() {
   const router = useRouter();
 
+  const [mainTab, setMainTab] = useState<WellbeingMainTab>('activity');
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [updateRequired, setUpdateRequired] = useState<boolean>(false);
@@ -32,9 +44,6 @@ export default function WellbeingScreen() {
   // Modal control states
   const [showActivityModal, setShowActivityModal] = useState<boolean>(false);
   const [showMoodModal, setShowMoodModal] = useState<boolean>(false);
-
-  // Daily Water Tracker state
-  const [loggedWater, setLoggedWater] = useState<number>(0);
 
   const fetchWellbeing = useCallback(async () => {
     try {
@@ -77,16 +86,6 @@ export default function WellbeingScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchWellbeing();
-  };
-
-  const handleQuickAddWater = async (amountMl: number) => {
-    const newTotal = loggedWater + amountMl;
-    setLoggedWater(newTotal);
-    try {
-      await WellbeingApiService.upsertHealthLog({ waterIntakeMl: newTotal });
-    } catch {
-      // Fallback
-    }
   };
 
   if (loading && !refreshing) {
@@ -141,7 +140,6 @@ export default function WellbeingScreen() {
     : 'BALANCED';
 
   const targetLiters = hydration?.targetMl ? (hydration.targetMl / 1000).toFixed(1) : '0';
-  const loggedLiters = (loggedWater / 1000).toFixed(1);
 
   const hasInsightsOrAlerts =
     !!workout || healthInsights.length > 0 || weatherAlerts.length > 0;
@@ -151,6 +149,7 @@ export default function WellbeingScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#0B0F17" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366F1" />
         }
@@ -161,151 +160,224 @@ export default function WellbeingScreen() {
             <Text style={styles.headerSubtitle}>DAILY OVERVIEW</Text>
             <Text style={styles.headerTitle}>Wellbeing & Vitals</Text>
           </View>
-          {wellbeingData?.location && (
-            <View style={styles.locationPill}>
-              <Text style={styles.locationText}>📍 {wellbeingData.location}</Text>
-            </View>
-          )}
-        </View>
 
-        {/* Quick Action Grid */}
-        <View style={styles.actionRowContainer}>
+          {/* Dynamic Action Button synced with Active Main Tab */}
           <TouchableOpacity
-            style={styles.actionCard}
-            activeOpacity={0.8}
-            onPress={() => setShowActivityModal(true)}
+            activeOpacity={0.85}
+            style={styles.addBtnContainer}
+            onPress={() => {
+              if (mainTab === 'activity') {
+                setShowActivityModal(true);
+              } else {
+                setShowMoodModal(true);
+              }
+            }}
           >
-            <Text style={styles.actionIcon}>🏃‍♂️</Text>
-            <Text style={styles.actionTitle}>Log Activity</Text>
-            <Text style={styles.actionSub}>Track work, exercise & more</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            activeOpacity={0.8}
-            onPress={() => setShowMoodModal(true)}
-          >
-            <Text style={styles.actionIcon}>🧘</Text>
-            <Text style={styles.actionTitle}>Log Mood</Text>
-            <Text style={styles.actionSub}>Track energy & feelings</Text>
+            <LinearGradient
+              colors={mainTab === 'activity' ? ['#6366F1', '#4F46E5'] : ['#10B981', '#059669']}
+              style={styles.addBtnGradient}
+            >
+              <Plus size={16} color="#FFFFFF" />
+              <Text style={styles.addBtnText}>
+                {mainTab === 'activity' ? 'Log Activity' : 'Log Mood'}
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
-        {/* Energy Balance */}
-        <LinearGradient
-          colors={['#1E1B4B', '#0F172A']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroCard}
-        >
-          <View style={styles.heroHeader}>
-            <Text style={styles.heroTitle}>Daily Energy Balance</Text>
-            <Text style={styles.heroBadge}>{formattedActivityLevel}</Text>
-          </View>
+        {/* Wellbeing Navigation Tabs */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tabButton, mainTab === 'activity' && styles.activeTabButton]}
+            onPress={() => setMainTab('activity')}
+            activeOpacity={0.8}
+          >
+            <Activity
+              size={16}
+              color={mainTab === 'activity' ? '#F8FAFC' : '#94A3B8'}
+              style={{ marginRight: 6 }}
+            />
+            <Text
+              style={[styles.tabButtonText, mainTab === 'activity' && styles.activeTabButtonText]}
+            >
+              Activity
+            </Text>
+          </TouchableOpacity>
 
-          <View style={styles.divider} />
+          <TouchableOpacity
+            style={[styles.tabButton, mainTab === 'mood' && styles.activeTabButton]}
+            onPress={() => setMainTab('mood')}
+            activeOpacity={0.8}
+          >
+            <Smile
+              size={16}
+              color={mainTab === 'mood' ? '#F8FAFC' : '#94A3B8'}
+              style={{ marginRight: 6 }}
+            />
+            <Text
+              style={[styles.tabButtonText, mainTab === 'mood' && styles.activeTabButtonText]}
+            >
+              Mood & Mind
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-          <View style={styles.energyRow}>
-            <View style={styles.energyInfo}>
-              <Text style={styles.energyLabel}>Recommended Daily Intake</Text>
-              <Text style={styles.energyValue}>
-                ~{metabolic?.tdee ?? 0} <Text style={styles.unit}>Calories / day</Text>
+        {/* Contextual AI Insight Banner */}
+        <View style={styles.insightCard}>
+          <View style={styles.insightHeader}>
+            <View style={styles.insightTag}>
+              <Lightbulb size={14} color={mainTab === 'activity' ? '#818CF8' : '#34D399'} />
+              <Text
+                style={[
+                  styles.insightTagText,
+                  { color: mainTab === 'activity' ? '#818CF8' : '#34D399' },
+                ]}
+              >
+                {mainTab === 'activity' ? 'RECOVERY & ENERGY' : 'MENTAL WELLNESS'}
               </Text>
             </View>
+            <Sparkles size={16} color="#64748B" />
           </View>
 
-          {metabolic?.tdeeNote ? (
-            <Text style={styles.tdeeNote}>💡 {metabolic.tdeeNote}</Text>
-          ) : null}
-        </LinearGradient>
+          <Text style={styles.insightBody}>
+            {mainTab === 'activity'
+              ? `Your recommended intake is ~${metabolic?.tdee ?? 0} kcal. Ensure adequate hydration (~${targetLiters}L) to maintain continuous focus.`
+              : 'Consistent emotional logging helps identify fatigue triggers early. Log your state to receive personalized mindfulness suggestions.'}
+          </Text>
 
-        {/* Screen Time Tracker */}
-        <View style={styles.cardWrapper}>
-          <ScreenTimeCard />
-        </View>
-
-        {/* Hydration Tracker */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardIcon}>💧</Text>
-            <Text style={styles.cardTitle}>Hydration Plan</Text>
-          </View>
-
-          <View style={styles.hydrationProgressRow}>
-            <Text style={styles.hydrationValue}>
-              {loggedLiters} L{' '}
-              <Text style={styles.hydrationTarget}>/ {targetLiters} L target</Text>
+          <TouchableOpacity style={styles.insightAction} activeOpacity={0.7}>
+            <Text
+              style={[
+                styles.insightActionText,
+                { color: mainTab === 'activity' ? '#818CF8' : '#34D399' },
+              ]}
+            >
+              {mainTab === 'activity' ? 'View Activity Plan' : 'Check Mood Trends'}
             </Text>
-          </View>
-
-          {hydration?.breakdown ? (
-            <Text style={styles.hydrationBreakdown}>{hydration.breakdown}</Text>
-          ) : null}
-
-          <View style={styles.quickAddRow}>
-            <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleQuickAddWater(100)}>
-              <Text style={styles.quickAddText}>+100 ml 💧</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleQuickAddWater(250)}>
-              <Text style={styles.quickAddText}>+250 ml 🥛</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleQuickAddWater(500)}>
-              <Text style={styles.quickAddText}>+500 ml 🍾</Text>
-            </TouchableOpacity>
-          </View>
+            <ArrowRight size={14} color={mainTab === 'activity' ? '#818CF8' : '#34D399'} />
+          </TouchableOpacity>
         </View>
 
-        {/* Environmental & Activity Insights */}
-        {hasInsightsOrAlerts && (
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardIcon}>🌿</Text>
-              <Text style={styles.cardTitle}>Environmental & Activity Insights</Text>
+        {/* TAB 1: ACTIVITY CONTENT */}
+        {mainTab === 'activity' ? (
+          <>
+            {/* Screen Time Tracker */}
+            <View style={styles.cardWrapper}>
+              <ScreenTimeCard />
             </View>
 
-            {/* Weather Alerts */}
-            {weatherAlerts.map((alert, index) => (
-              <View key={`alert-${index}`} style={styles.insightItem}>
-                <Text style={styles.alertTitle}>⚠️ {alert.event}</Text>
-                <Text style={styles.insightMessage}>{alert.description}</Text>
+            {/* Daily Energy & Hydration Balance */}
+            <LinearGradient
+              colors={['#1E1B4B', '#0F172A']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroCard}
+            >
+              <View style={styles.heroHeader}>
+                <Text style={styles.heroTitle}>Daily Energy & Hydration</Text>
+                <Text style={styles.heroBadge}>{formattedActivityLevel}</Text>
               </View>
-            ))}
 
-            {/* Workout Advisory */}
-            {workout && (
-              <View style={styles.insightItem}>
-                <Text style={styles.subSectionTitle}>Workout Advisory</Text>
-                <Text style={styles.advisoryStatus}>
-                  {workout.isOutdoorExerciseRecommended
-                    ? '🏃‍♂️ Great conditions for outside workouts.'
-                    : '⚠️ Consider exercising indoors today.'}
-                </Text>
-                {workout.warnings?.map((warning, idx) => (
-                  <Text key={`warning-${idx}`} style={styles.bulletWarning}>
-                    • {warning}
+              <View style={styles.divider} />
+
+              <View style={styles.metricsGrid}>
+                <View style={styles.energyInfo}>
+                  <Text style={styles.energyLabel}>Recommended Daily Intake</Text>
+                  <Text style={styles.energyValue}>
+                    ~{metabolic?.tdee ?? 0} <Text style={styles.unit}>Calories / day</Text>
                   </Text>
+                </View>
+
+                <View style={styles.verticalDivider} />
+
+                <View style={styles.energyInfo}>
+                  <Text style={styles.energyLabel}>Target Water Intake</Text>
+                  <Text style={styles.hydrationValue}>
+                    ~{targetLiters} <Text style={styles.unit}>Liters / day</Text>
+                  </Text>
+                </View>
+              </View>
+
+              {metabolic?.tdeeNote ? (
+                <Text style={styles.tdeeNote}>💡 {metabolic.tdeeNote}</Text>
+              ) : null}
+            </LinearGradient>
+
+            {/* Environmental & Activity Insights */}
+            {hasInsightsOrAlerts && (
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.cardIcon}>🌿</Text>
+                  <Text style={styles.cardTitle}>Environmental & Activity Insights</Text>
+                </View>
+
+                {/* Weather Alerts */}
+                {weatherAlerts.map((alert, index) => (
+                  <View key={`alert-${index}`} style={styles.insightItem}>
+                    <Text style={styles.alertTitle}>⚠️ {alert.event}</Text>
+                    <Text style={styles.insightMessage}>{alert.description}</Text>
+                  </View>
+                ))}
+
+                {/* Workout Advisory */}
+                {workout && (
+                  <View style={styles.insightItem}>
+                    <Text style={styles.subSectionTitle}>Workout Advisory</Text>
+                    <Text style={styles.advisoryStatus}>
+                      {workout.isOutdoorExerciseRecommended
+                        ? '🏃‍♂️ Great conditions for outside workouts.'
+                        : '⚠️ Consider exercising indoors today.'}
+                    </Text>
+                    {workout.warnings?.map((warning, idx) => (
+                      <Text key={`warning-${idx}`} style={styles.bulletWarning}>
+                        • {warning}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+                {/* Health Insights List */}
+                {healthInsights.map((insight, index) => (
+                  <View key={`insight-${index}`} style={styles.insightItem}>
+                    <View style={styles.insightHeader}>
+                      <Text style={styles.subSectionTitle}>{insight.category}</Text>
+                      <Text
+                        style={[
+                          styles.levelBadge,
+                          insight.level === 'HIGH' && styles.levelHigh,
+                          insight.level === 'MEDIUM' && styles.levelMedium,
+                        ]}
+                      >
+                        {insight.level}
+                      </Text>
+                    </View>
+                    <Text style={styles.insightMessage}>{insight.message}</Text>
+                  </View>
                 ))}
               </View>
             )}
-
-            {/* Health Insights List */}
-            {healthInsights.map((insight, index) => (
-              <View key={`insight-${index}`} style={styles.insightItem}>
-                <View style={styles.insightHeader}>
-                  <Text style={styles.subSectionTitle}>{insight.category}</Text>
-                  <Text
-                    style={[
-                      styles.levelBadge,
-                      insight.level === 'HIGH' && styles.levelHigh,
-                      insight.level === 'MEDIUM' && styles.levelMedium,
-                    ]}
-                  >
-                    {insight.level}
-                  </Text>
-                </View>
-                <Text style={styles.insightMessage}>{insight.message}</Text>
+          </>
+        ) : (
+          /* TAB 2: MOOD & MIND CONTENT */
+          <View style={styles.moodContainer}>
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <Zap size={18} color="#10B981" style={{ marginRight: 8 }} />
+                <Text style={styles.cardTitle}>Emotional Balance & Focus</Text>
               </View>
-            ))}
+
+              <Text style={styles.moodSummaryText}>
+                No mood logs recorded for today yet. Use the top button to quickly record your focus, stress, or overall emotional energy level.
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.logMoodOutlineBtn}
+                onPress={() => setShowMoodModal(true)}
+              >
+                <Text style={styles.logMoodOutlineBtnText}>+ Log Current Mood</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -351,39 +423,76 @@ const styles = StyleSheet.create({
   primaryBtn: { width: '100%', height: 52, borderRadius: 12, overflow: 'hidden' },
   btnGradient: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   primaryBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  
+  // Header
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   headerSubtitle: { fontSize: 11, fontWeight: '800', color: '#6366F1', letterSpacing: 1.5 },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#F8FAFC' },
-  locationPill: { backgroundColor: '#1E293B', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
-  locationText: { fontSize: 12, color: '#CBD5E1' },
-  
-  actionRowContainer: {
+  addBtnContainer: { borderRadius: 10, overflow: 'hidden' },
+  addBtnGradient: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 6 },
+  addBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+
+  // Tabs
+  tabsContainer: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  actionCard: {
-    flex: 1,
     backgroundColor: '#151C2C',
-    borderRadius: 16,
-    padding: 14,
+    padding: 4,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#1E293B',
+    marginBottom: 16,
   },
-  actionIcon: { fontSize: 22, marginBottom: 8 },
-  actionTitle: { fontSize: 15, fontWeight: '700', color: '#F8FAFC', marginBottom: 2 },
-  actionSub: { fontSize: 11, color: '#94A3B8' },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  activeTabButton: {
+    backgroundColor: '#312E81',
+  },
+  tabButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  activeTabButtonText: {
+    color: '#F8FAFC',
+    fontWeight: '700',
+  },
 
+  // AI Insight Card
+  insightCard: {
+    backgroundColor: '#151C2C',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    marginBottom: 16,
+  },
+  insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  insightTag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  insightTagText: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  insightBody: { fontSize: 13, color: '#94A3B8', lineHeight: 18, marginBottom: 12 },
+  insightAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  insightActionText: { fontSize: 12, fontWeight: '700' },
+
+  // Cards
   heroCard: { borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#312E81' },
   heroTitle: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
   heroBadge: { fontSize: 11, color: '#A5B4FC', backgroundColor: '#312E81', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, fontWeight: '700' },
   heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   divider: { height: 1, backgroundColor: '#312E81', marginVertical: 14 },
-  energyRow: { flexDirection: 'row', alignItems: 'baseline' },
+  
+  metricsGrid: { flexDirection: 'row', alignItems: 'center' },
+  verticalDivider: { width: 1, backgroundColor: '#312E81', height: '100%', marginHorizontal: 12 },
   energyInfo: { flex: 1 },
-  energyLabel: { fontSize: 12, color: '#94A3B8', marginBottom: 4 },
-  energyValue: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  unit: { fontSize: 12, color: '#94A3B8', fontWeight: '400' },
+  energyLabel: { fontSize: 11, color: '#94A3B8', marginBottom: 4 },
+  energyValue: { fontSize: 20, fontWeight: '800', color: '#FFFFFF' },
+  hydrationValue: { fontSize: 20, fontWeight: '800', color: '#38BDF8' },
+  unit: { fontSize: 11, color: '#94A3B8', fontWeight: '400' },
   tdeeNote: { fontSize: 12, color: '#C7D2FE', marginTop: 12 },
   
   cardWrapper: {
@@ -401,7 +510,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#1E293B',
   },
-  insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   subSectionTitle: { fontSize: 12, fontWeight: '700', color: '#6366F1', marginBottom: 4, textTransform: 'uppercase' },
   alertTitle: { fontSize: 13, fontWeight: '700', color: '#EF4444', marginBottom: 4 },
   advisoryStatus: { fontSize: 13, color: '#CBD5E1', marginBottom: 4 },
@@ -411,11 +519,27 @@ const styles = StyleSheet.create({
   levelHigh: { color: '#EF4444', backgroundColor: '#451A03' },
   levelMedium: { color: '#F59E0B', backgroundColor: '#451A03' },
 
-  hydrationProgressRow: { marginVertical: 8 },
-  hydrationValue: { fontSize: 24, fontWeight: '800', color: '#38BDF8' },
-  hydrationTarget: { fontSize: 13, color: '#64748B', fontWeight: '500' },
-  hydrationBreakdown: { fontSize: 12, color: '#94A3B8', marginBottom: 12 },
-  quickAddRow: { flexDirection: 'row', gap: 8 },
-  quickAddBtn: { flex: 1, backgroundColor: '#1E293B', paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  quickAddText: { color: '#38BDF8', fontWeight: '600', fontSize: 12 },
+  // Mood Tab Content
+  moodContainer: {
+    marginTop: 4,
+  },
+  moodSummaryText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  logMoodOutlineBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#059669',
+    backgroundColor: '#064E3B20',
+  },
+  logMoodOutlineBtnText: {
+    color: '#34D399',
+    fontWeight: '700',
+    fontSize: 13,
+  },
 });

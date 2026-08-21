@@ -28,6 +28,7 @@ export interface Task {
   isTopPriority: boolean;
   dueDate: string | null;
   category: string | null;
+  habitId?: string | null;
   tags: string[];
   createdAt: string;
 }

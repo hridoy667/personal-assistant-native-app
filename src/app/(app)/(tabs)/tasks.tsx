@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,38 +13,37 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Search, Sparkles, CheckCircle2, Clock } from 'lucide-react-native';
+import { Plus, Search, Sparkles, Flame, Award, Lightbulb, ArrowRight } from 'lucide-react-native';
 
 import { TaskItem } from '@/components/TaskItem';
 import { TaskFormModal } from '@/components/modals/TaskFormModal';
+import { HabitFormModal } from '@/components/modals/HabitFormModal';
+import { CreateHabitDto, Habit, UpdateHabitDto } from '@/types/habits';
+import { HabitsApiService } from '@/services/habitService';
+import { TasksTopTabs, TaskMainTab } from '@/components/tasks/TasksTopTabs';
 import { Task, CreateTaskPayload } from '@/types/task';
 import { taskService } from '@/services/task.service';
 
 const PAGE_LIMIT = 10;
 
 export default function TasksScreen() {
+  const [mainTab, setMainTab] = useState<TaskMainTab>('tasks');
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Cursor Pagination State & Server Total Count
-  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
-  const [hasNextPage, setHasNextPage] = useState<boolean>(false);
-  const [totalCount, setTotalCount] = useState<number>(0);
-
-  // Reusable Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Modals & Editing State
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
 
-  // Filter Tab State ('all' | 'pending' | 'completed')
+  // Filter Tabs
   const [activeSection, setActiveSection] = useState<'all' | 'pending' | 'completed'>('all');
 
-  // Track user scroll momentum to prevent premature onEndReached firing
-  const onEndReachedCalledDuringMomentum = useRef<boolean>(true);
-
-  // Fetch First Page
+  // Fetch Tasks
   const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
@@ -55,152 +54,155 @@ export default function TasksScreen() {
       });
 
       setTasks(response.data || []);
-      setNextCursor(response.meta?.nextCursor);
-      setHasNextPage(response.meta?.hasNextPage || false);
-      setTotalCount(response.meta?.total || 0);
     } catch (error) {
-      Alert.alert('Error', 'Failed to fetch tasks from server.');
+      Alert.alert('Error', 'Failed to fetch tasks.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [searchQuery, activeSection]);
 
-  // Fetch Next Page (Infinite Scroll)
-  const fetchNextPage = async () => {
-    if (
-      onEndReachedCalledDuringMomentum.current ||
-      !hasNextPage ||
-      loadingMore ||
-      !nextCursor
-    ) {
-      return;
-    }
-
+  // Fetch Habits
+  const fetchHabits = useCallback(async () => {
     try {
-      setLoadingMore(true);
-      onEndReachedCalledDuringMomentum.current = true;
-
-      const response = await taskService.getTasks({
-        limit: PAGE_LIMIT,
-        cursor: nextCursor,
-        search: searchQuery || undefined,
-        status: activeSection,
-      });
-
-      setTasks(prev => [...prev, ...(response.data || [])]);
-      setNextCursor(response.meta?.nextCursor);
-      setHasNextPage(response.meta?.hasNextPage || false);
-      if (response.meta?.total !== undefined) {
-        setTotalCount(response.meta.total);
-      }
+      setLoading(true);
+      const data = await HabitsApiService.findAll();
+      setHabits(data || []);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load more tasks.');
+      Alert.alert('Error', 'Failed to fetch habits.');
     } finally {
-      setLoadingMore(false);
+      setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchTasks();
-  };
-
-  const handleToggleTask = async (id: string) => {
-    setTasks(prev =>
-      prev.map(t => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
-    );
-    try {
-      await taskService.toggleTask(id);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to toggle task status.');
+    if (mainTab === 'tasks') {
       fetchTasks();
+    } else {
+      fetchHabits();
     }
-  };
+  }, [mainTab, fetchTasks, fetchHabits]);
 
-  const handleDeleteTask = async (id: string) => {
-    Alert.alert('Confirm Delete', 'Are you sure you want to delete this task?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          setTasks(prev => prev.filter(t => t.id !== id));
-          try {
-            await taskService.deleteTask(id);
-            fetchTasks();
-          } catch (error) {
-            Alert.alert('Error', 'Failed to delete task.');
-            fetchTasks();
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleFormSubmit = async (payload: CreateTaskPayload) => {
+  const handleTaskSubmit = async (payload: CreateTaskPayload) => {
     try {
       if (editingTask) {
         await taskService.updateTask(editingTask.id, payload);
       } else {
         await taskService.createTask(payload);
       }
+      setIsTaskModalOpen(false);
+      setEditingTask(null);
       fetchTasks();
     } catch (error) {
       Alert.alert('Error', 'Failed to save task.');
     }
   };
 
-  const renderFooter = () => {
-    if (!loadingMore) return null;
-    return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#6366F1" />
-      </View>
-    );
+  const handleHabitSubmit = async (payload: CreateHabitDto | UpdateHabitDto) => {
+    try {
+      if (editingHabit) {
+        await HabitsApiService.update(editingHabit.id, payload as UpdateHabitDto);
+        Alert.alert('Success', `Habit updated!`);
+      } else {
+        await HabitsApiService.create(payload as CreateHabitDto);
+        Alert.alert('Success', `Habit created!`);
+      }
+      setIsHabitModalOpen(false);
+      setEditingHabit(null);
+      fetchHabits();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save habit.');
+    }
   };
 
-  // Compute tasks metadata for hero metrics
-  const completedCount = tasks.filter(t => t.isCompleted).length;
-  const pendingCount = tasks.length - completedCount;
+  const renderHabitItem = ({ item }: { item: Habit }) => (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => {
+        setEditingHabit(item);
+        setIsHabitModalOpen(true);
+      }}
+      style={styles.habitCard}
+    >
+      <View style={styles.habitMainInfo}>
+        <Text style={styles.habitTitle}>{item.title}</Text>
+
+        <View style={styles.habitMetaRow}>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{item.frequency?.join(', ')}</Text>
+          </View>
+          {item.unit ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {item.targetValue} {item.unit}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      <View style={styles.habitStreakContainer}>
+        <View style={styles.streakBox}>
+          <Flame size={16} color="#F59E0B" />
+          <Text style={styles.streakCount}>{item.currentStreak}</Text>
+          <Text style={styles.streakLabel}>Current</Text>
+        </View>
+
+        <View style={styles.streakDivider} />
+
+        <View style={styles.streakBox}>
+          <Award size={16} color="#6366F1" />
+          <Text style={styles.streakCount}>{item.longestStreak}</Text>
+          <Text style={styles.streakLabel}>Best</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#0B0F17" />
 
-      {/* Main List Container */}
-      <FlatList
-        data={tasks}
+      <FlatList<Task | Habit>
+        data={mainTab === 'tasks' ? tasks : habits}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <TaskItem
-            task={item}
-            onToggle={handleToggleTask}
-            onDelete={handleDeleteTask}
-            onEdit={t => {
-              setEditingTask(t);
-              setIsModalOpen(true);
-            }}
-          />
-        )}
+        renderItem={({ item }) => {
+          if (mainTab === 'tasks') {
+            return (
+              <TaskItem
+                task={item as Task}
+                onToggle={async id => {
+                  setTasks(prev =>
+                    prev.map(t => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
+                  );
+                  await taskService.toggleTask(id);
+                }}
+                onDelete={async id => {
+                  setTasks(prev => prev.filter(t => t.id !== id));
+                  await taskService.deleteTask(id);
+                }}
+                onEdit={t => {
+                  setEditingTask(t);
+                  setIsTaskModalOpen(true);
+                }}
+              />
+            );
+          }
+          return renderHabitItem({ item: item as Habit });
+        }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        onEndReached={fetchNextPage}
-        onEndReachedThreshold={0.2}
-        onMomentumScrollBegin={() => {
-          onEndReachedCalledDuringMomentum.current = false;
-        }}
-        ListFooterComponent={renderFooter}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366F1" />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={mainTab === 'tasks' ? fetchTasks : fetchHabits}
+            tintColor="#6366F1"
+          />
         }
         ListHeaderComponent={
           <>
-            {/* Top Header */}
+            {/* Header */}
             <View style={styles.header}>
               <View>
                 <Text style={styles.headerSubtitle}>WORKFLOW</Text>
@@ -211,243 +213,175 @@ export default function TasksScreen() {
                 activeOpacity={0.85}
                 style={styles.addBtnContainer}
                 onPress={() => {
-                  setEditingTask(null);
-                  setIsModalOpen(true);
+                  if (mainTab === 'tasks') {
+                    setEditingTask(null);
+                    setIsTaskModalOpen(true);
+                  } else {
+                    setEditingHabit(null);
+                    setIsHabitModalOpen(true);
+                  }
                 }}
               >
                 <LinearGradient
-                  colors={['#6366F1', '#4F46E5']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
+                  colors={mainTab === 'tasks' ? ['#6366F1', '#4F46E5'] : ['#F59E0B', '#D97706']}
                   style={styles.addBtnGradient}
                 >
-                  <Plus color="#FFFFFF" size={18} />
-                  <Text style={styles.addBtnText}>New Task</Text>
+                  <Plus size={16} color="#FFFFFF" />
+                  <Text style={styles.addBtnText}>
+                    {mainTab === 'tasks' ? 'New Task' : 'Log Habit'}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
 
-            {/* Hero Overview Card */}
-            <LinearGradient
-              colors={['#1E1B4B', '#0F172A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroCard}
-            >
-              <View style={styles.heroHeader}>
-                <Text style={styles.heroTitle}>Productivity Summary</Text>
-                <Text style={styles.heroBadge}>Active Session</Text>
+            {/* Top Navigation Tabs */}
+            <TasksTopTabs activeTab={mainTab} onSelectTab={setMainTab} />
+
+            {/* Contextual AI Insight Banner */}
+            <View style={styles.insightCard}>
+              <View style={styles.insightHeader}>
+                <View style={styles.insightTag}>
+                  <Lightbulb size={14} color={mainTab === 'tasks' ? '#818CF8' : '#FBBF24'} />
+                  <Text
+                    style={[
+                      styles.insightTagText,
+                      { color: mainTab === 'tasks' ? '#818CF8' : '#FBBF24' },
+                    ]}
+                  >
+                    {mainTab === 'tasks' ? 'TASK OPTIMIZER' : 'STREAK COACH'}
+                  </Text>
+                </View>
+                <Sparkles size={16} color="#64748B" />
               </View>
 
-              <View style={styles.divider} />
+              <Text style={styles.insightBody}>
+                {mainTab === 'tasks'
+                  ? 'You have 3 high-priority items pending today. Focus on completing them during your peak energy hours.'
+                  : 'Consistent morning routines boost daily output by 25%. Maintain your top habit streaks this week!'}
+              </Text>
 
-              <View style={styles.statsRow}>
-                <View style={styles.statBox}>
-                  <Text style={styles.statNumber}>{totalCount}</Text>
-                  <Text style={styles.statLabel}>Total Found</Text>
-                </View>
-
-                <View style={styles.statBorder} />
-
-                <View style={styles.statBox}>
-                  <View style={styles.statLabelRow}>
-                    <Clock color="#F59E0B" size={12} />
-                    <Text style={styles.statNumberAlt}>{pendingCount}</Text>
-                  </View>
-                  <Text style={styles.statLabel}>Pending</Text>
-                </View>
-
-                <View style={styles.statBorder} />
-
-                <View style={styles.statBox}>
-                  <View style={styles.statLabelRow}>
-                    <CheckCircle2 color="#10B981" size={12} />
-                    <Text style={styles.statNumberAlt}>{completedCount}</Text>
-                  </View>
-                  <Text style={styles.statLabel}>Completed</Text>
-                </View>
-              </View>
-            </LinearGradient>
-
-            {/* Search Input */}
-            <View style={styles.searchContainer}>
-              <Search color="#64748B" size={18} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search tasks..."
-                placeholderTextColor="#64748B"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-
-            {/* Filter Tabs */}
-            <View style={styles.filterTabs}>
-              <TouchableOpacity
-                style={[styles.filterTab, activeSection === 'all' && styles.activeFilterTab]}
-                onPress={() => setActiveSection('all')}
-              >
-                <Text style={[styles.filterTabText, activeSection === 'all' && styles.activeFilterTabText]}>
-                  All
+              <TouchableOpacity style={styles.insightAction} activeOpacity={0.7}>
+                <Text
+                  style={[
+                    styles.insightActionText,
+                    { color: mainTab === 'tasks' ? '#818CF8' : '#FBBF24' },
+                  ]}
+                >
+                  {mainTab === 'tasks' ? 'Prioritize Schedule' : 'View Analytics'}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterTab, activeSection === 'pending' && styles.activeFilterTab]}
-                onPress={() => setActiveSection('pending')}
-              >
-                <Text style={[styles.filterTabText, activeSection === 'pending' && styles.activeFilterTabText]}>
-                  Pending
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterTab, activeSection === 'completed' && styles.activeFilterTab]}
-                onPress={() => setActiveSection('completed')}
-              >
-                <Text style={[styles.filterTabText, activeSection === 'completed' && styles.activeFilterTabText]}>
-                  Completed
-                </Text>
+                <ArrowRight size={14} color={mainTab === 'tasks' ? '#818CF8' : '#FBBF24'} />
               </TouchableOpacity>
             </View>
+
+            {/* Filters (Tasks Tab Only) */}
+            {mainTab === 'tasks' && (
+              <>
+                <View style={styles.searchContainer}>
+                  <Search color="#64748B" size={18} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search tasks..."
+                    placeholderTextColor="#64748B"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                </View>
+
+                <View style={styles.filterTabs}>
+                  {(['all', 'pending', 'completed'] as const).map(sec => (
+                    <TouchableOpacity
+                      key={sec}
+                      style={[
+                        styles.filterTab,
+                        activeSection === sec && styles.activeFilterTab,
+                      ]}
+                      onPress={() => setActiveSection(sec)}
+                    >
+                      <Text
+                        style={[
+                          styles.filterTabText,
+                          activeSection === sec && styles.activeFilterTabText,
+                        ]}
+                      >
+                        {sec.charAt(0).toUpperCase() + sec.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
           </>
         }
         ListEmptyComponent={
           loading ? (
-            <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color="#6366F1" />
-            </View>
-          ) : (
+            <ActivityIndicator size="large" color="#6366F1" style={{ marginTop: 40 }} />
+          ) : mainTab === 'tasks' ? (
             <View style={styles.emptyContainer}>
               <Sparkles color="#6366F1" size={36} />
               <Text style={styles.emptyTitle}>No Tasks Found</Text>
               <Text style={styles.emptySub}>Create a task to kickstart your day.</Text>
             </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Sparkles color="#F59E0B" size={36} />
+              <Text style={styles.emptyTitle}>No Habits Tracked Yet</Text>
+              <Text style={styles.emptySub}>Tap "Log Habit" above to start building consistency.</Text>
+            </View>
           )
         }
       />
 
-      {/* Reusable Form Modal */}
+      {/* Task Modal */}
       <TaskFormModal
-        visible={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleFormSubmit}
+        visible={isTaskModalOpen}
+        onClose={() => {
+          setIsTaskModalOpen(false);
+          setEditingTask(null);
+        }}
+        onSubmit={handleTaskSubmit}
         initialTask={editingTask}
+      />
+
+      {/* Habit Modal */}
+      <HabitFormModal
+        visible={isHabitModalOpen}
+        onClose={() => {
+          setIsHabitModalOpen(false);
+          setEditingHabit(null);
+        }}
+        onSubmit={handleHabitSubmit}
+        initialHabit={editingHabit}
       />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0B0F17',
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16, // Matches Wellbeing page bottom padding
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#6366F1',
-    letterSpacing: 1.5,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#F8FAFC',
-  },
-  addBtnContainer: {
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  addBtnGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 6,
-  },
-  addBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
+  container: { flex: 1, backgroundColor: '#0B0F17' },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  headerSubtitle: { fontSize: 11, fontWeight: '800', color: '#6366F1', letterSpacing: 1.5 },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: '#F8FAFC' },
+  addBtnContainer: { borderRadius: 10, overflow: 'hidden' },
+  addBtnGradient: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 6 },
+  addBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
 
-  // Hero Overview Card
-  heroCard: {
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 16,
+  // AI Insight Card
+  insightCard: {
+    backgroundColor: '#151C2C',
+    borderRadius: 14,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#312E81',
+    borderColor: '#1E293B',
+    marginBottom: 16,
   },
-  heroHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  heroTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  heroBadge: {
-    fontSize: 11,
-    color: '#A5B4FC',
-    backgroundColor: '#312E81',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#312E81',
-    marginVertical: 12,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  statNumberAlt: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginLeft: 4,
-  },
-  statLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  statBorder: {
-    width: 1,
-    height: 28,
-    backgroundColor: '#312E81',
-  },
+  insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  insightTag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  insightTagText: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  insightBody: { fontSize: 13, color: '#94A3B8', lineHeight: 18, marginBottom: 12 },
+  insightAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  insightActionText: { fontSize: 12, fontWeight: '700' },
 
-  // Search Input
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -459,65 +393,52 @@ const styles = StyleSheet.create({
     borderColor: '#1E293B',
     marginBottom: 14,
   },
-  searchInput: {
-    flex: 1,
-    color: '#F8FAFC',
-    fontSize: 14,
-    marginLeft: 10,
-  },
+  searchInput: { flex: 1, color: '#F8FAFC', fontSize: 14, marginLeft: 10 },
+  filterTabs: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  filterTab: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: '#151C2C', borderRadius: 10, borderWidth: 1, borderColor: '#1E293B' },
+  activeFilterTab: { backgroundColor: '#312E81', borderColor: '#6366F1' },
+  filterTabText: { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
+  activeFilterTabText: { color: '#F8FAFC', fontWeight: '700' },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50 },
+  emptyTitle: { color: '#F8FAFC', fontSize: 16, fontWeight: '700', marginTop: 12 },
+  emptySub: { color: '#64748B', fontSize: 13, marginTop: 4 },
 
-  // Filter Tabs
-  filterTabs: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  filterTab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
+  // Habit Card Styles
+  habitCard: {
     backgroundColor: '#151C2C',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  habitMainInfo: { flex: 1, marginRight: 12 },
+  habitTitle: { fontSize: 16, fontWeight: '700', color: '#F8FAFC', marginBottom: 8 },
+  habitMetaRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  badge: {
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  badgeText: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
+  habitStreakContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0B0F17',
     borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: '#1E293B',
   },
-  activeFilterTab: {
-    backgroundColor: '#312E81',
-    borderColor: '#6366F1',
-  },
-  filterTabText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  activeFilterTabText: {
-    color: '#F8FAFC',
-    fontWeight: '700',
-  },
-
-  // States
-  centerContainer: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 50,
-  },
-  emptyTitle: {
-    color: '#F8FAFC',
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 12,
-  },
-  emptySub: {
-    color: '#64748B',
-    fontSize: 13,
-    marginTop: 4,
-  },
-  footerLoader: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
+  streakBox: { alignItems: 'center', minWidth: 44 },
+  streakCount: { color: '#F8FAFC', fontSize: 14, fontWeight: '800', marginTop: 2 },
+  streakLabel: { color: '#64748B', fontSize: 9, fontWeight: '600' },
+  streakDivider: { width: 1, height: 24, backgroundColor: '#1E293B', marginHorizontal: 8 },
 });
