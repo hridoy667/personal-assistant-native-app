@@ -2,10 +2,15 @@ import React, { useEffect } from 'react';
 import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogOut } from 'lucide-react-native';
+
+// Components
 import { QuranCard } from '@/components/cards/QuranCard';
 import { TaskListCard } from '@/components/cards/TaskListCard';
 import { WeatherCard } from '@/components/cards/WeatherCard';
+import { DynamicContextCard } from '@/components/cards/DynamicContextCard';
 import { FloatingActionButton } from '@/components/common/FloatingActionButton';
+
+// Context & Helpers
 import { useAuth } from '@/context/AuthContext';
 import { 
   checkAndRequestUsagePermission, 
@@ -30,7 +35,7 @@ export default function HomeScreen() {
   const { logout } = useAuth();
   const insets = useSafeAreaInsets();
 
-  // Check availability first; check/request permission on initial load and sync if granted
+  // Check usage availability & permissions on initial load
   useEffect(() => {
     const initializeScreenTime = async () => {
       if (!isUsageStatsAvailable()) {
@@ -71,12 +76,29 @@ export default function HomeScreen() {
         return (
           <View style={styles.topCardWrapper}>
             <WeatherCard />
+            
+            {/* Dynamic Card Pocket: Toggles between Sleep/Wake inputs & AI suggestions */}
+            <View style={styles.pocketContainer}>
+              <DynamicContextCard 
+                userDefaultSleepTime="23:00"
+                onActionPress={(data) => {
+                  if (data.type === 'CRITICAL_TASK') {
+                    // Action for task focus
+                  } else {
+                    // Action for AI Insight
+                  }
+                }} 
+              />
+            </View>
           </View>
         );
+
       case 'quran':
         return <QuranCard />;
+
       case 'tasks':
         return <TaskListCard />;
+
       case 'footer':
         return (
           <View style={styles.footer}>
@@ -98,6 +120,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         );
+
       default:
         return null;
     }
@@ -121,7 +144,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Floating Speed Dial Action Button */}
+      {/* Floating Action Speed Dial */}
       <FloatingActionButton />
     </View>
   );
@@ -138,6 +161,10 @@ const styles = StyleSheet.create({
   },
   topCardWrapper: {
     marginTop: 4,
+    gap: 10,
+  },
+  pocketContainer: {
+    marginTop: 0,
   },
   footer: {
     alignItems: 'center',

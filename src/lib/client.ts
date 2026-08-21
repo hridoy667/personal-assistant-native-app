@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 // Define the root tunnel host without /api attached
-const LOCAL_TUNNEL_URL = 'http://192.168.1.3:5000/api';
+const LOCAL_TUNNEL_URL = 'http://192.168.1.4:5000/api';
 
 // Strip trailing slash if present
 const RAW_BASE = (process.env.EXPO_PUBLIC_API_URL || LOCAL_TUNNEL_URL).replace(/\/$/, '');
@@ -146,18 +146,35 @@ export async function apiClient<T>(
   }
 
   const rawText = await response.text();
-  let responseData: any = {};
+
+  // Guard against completely empty response bodies (e.g., HTTP 200 with no content)
+  if (!rawText || rawText.trim() === '') {
+    if (!response.ok) {
+      const errorMsg = extractErrorMessage({}, response.status);
+      console.error(`[API Error] ${response.status}:`, errorMsg);
+      throw new Error(errorMsg);
+    }
+    return null as T;
+  }
+
+  let responseData: any = null;
+  let isJson = true;
 
   try {
     responseData = JSON.parse(rawText);
   } catch {
-    console.warn('[API Client] Non-JSON Response received:', rawText.slice(0, 150));
+    isJson = false;
   }
 
   if (!response.ok) {
-    const errorMsg = extractErrorMessage(responseData, response.status);
+    // If response was non-JSON, pass rawText so error extraction receives context
+    const errorMsg = extractErrorMessage(isJson ? responseData : rawText, response.status);
     console.error(`[API Error] ${response.status}:`, errorMsg);
     throw new Error(errorMsg);
+  }
+
+  if (!isJson) {
+    console.warn('[API Client] Non-JSON Response received:', rawText.slice(0, 150));
   }
 
   return responseData as T;
