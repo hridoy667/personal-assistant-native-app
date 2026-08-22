@@ -13,37 +13,43 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Search, Sparkles, Flame, Award, Lightbulb, ArrowRight } from 'lucide-react-native';
+import { Plus, Search, Sparkles, Lightbulb, ArrowRight } from 'lucide-react-native';
 
 import { TaskItem } from '@/components/TaskItem';
 import { TaskFormModal } from '@/components/modals/TaskFormModal';
-import { HabitFormModal } from '@/components/modals/HabitFormModal';
-import { CreateHabitDto, Habit, UpdateHabitDto } from '@/types/habits';
-import { HabitsApiService } from '@/services/habitService';
+import { SkillFormModal } from '@/components/modals/SkillFormModal';
 import { TasksTopTabs, TaskMainTab } from '@/components/tasks/TasksTopTabs';
+import { SkillCard } from '@/components/skills/SkillCard';
+import { AiGeneratingLoader } from '@/components/skills/AiGeneratingLoader';
+
 import { Task, CreateTaskPayload } from '@/types/task';
+import { Skill, GenerateSkillRoadmapDto, UpdateSkillDto } from '@/types/skills';
+
 import { taskService } from '@/services/task.service';
+import { SkillsApiService } from '@/services/skillsService';
 
 const PAGE_LIMIT = 10;
 
 export default function TasksScreen() {
   const [mainTab, setMainTab] = useState<TaskMainTab>('tasks');
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [habits, setHabits] = useState<Habit[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [aiGenerating, setAiGenerating] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals & Editing State
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
+  const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
 
-  // Filter Tabs
+  // Filter Tabs (For Tasks)
   const [activeSection, setActiveSection] = useState<'all' | 'pending' | 'completed'>('all');
 
-  // Fetch Tasks
+  const isSkillsTab = mainTab === 'skills';
+
   const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
@@ -52,9 +58,8 @@ export default function TasksScreen() {
         search: searchQuery || undefined,
         status: activeSection,
       });
-
       setTasks(response.data || []);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to fetch tasks.');
     } finally {
       setLoading(false);
@@ -62,14 +67,13 @@ export default function TasksScreen() {
     }
   }, [searchQuery, activeSection]);
 
-  // Fetch Habits
-  const fetchHabits = useCallback(async () => {
+  const fetchSkills = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await HabitsApiService.findAll();
-      setHabits(data || []);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to fetch habits.');
+      const data = await SkillsApiService.findAll();
+      setSkills(data || []);
+    } catch {
+      Alert.alert('Error', 'Failed to fetch skills.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -80,9 +84,9 @@ export default function TasksScreen() {
     if (mainTab === 'tasks') {
       fetchTasks();
     } else {
-      fetchHabits();
+      fetchSkills();
     }
-  }, [mainTab, fetchTasks, fetchHabits]);
+  }, [mainTab, fetchTasks, fetchSkills]);
 
   const handleTaskSubmit = async (payload: CreateTaskPayload) => {
     try {
@@ -94,78 +98,80 @@ export default function TasksScreen() {
       setIsTaskModalOpen(false);
       setEditingTask(null);
       fetchTasks();
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to save task.');
     }
   };
 
-  const handleHabitSubmit = async (payload: CreateHabitDto | UpdateHabitDto) => {
+  const handleSkillSubmit = async (payload: GenerateSkillRoadmapDto | UpdateSkillDto) => {
     try {
-      if (editingHabit) {
-        await HabitsApiService.update(editingHabit.id, payload as UpdateHabitDto);
-        Alert.alert('Success', `Habit updated!`);
+      setIsSkillModalOpen(false);
+      if (editingSkill) {
+        await SkillsApiService.update(editingSkill.id, payload as UpdateSkillDto);
+        Alert.alert('Success', 'Skill updated successfully!');
       } else {
-        await HabitsApiService.create(payload as CreateHabitDto);
-        Alert.alert('Success', `Habit created!`);
+        setAiGenerating(true);
+        await SkillsApiService.generateSkill(payload as GenerateSkillRoadmapDto);
       }
-      setIsHabitModalOpen(false);
-      setEditingHabit(null);
-      fetchHabits();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save habit.');
+      setEditingSkill(null);
+      fetchSkills();
+    } catch {
+      Alert.alert('Error', 'Failed to process skill.');
+    } finally {
+      setAiGenerating(false);
     }
   };
 
-  const renderHabitItem = ({ item }: { item: Habit }) => (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={() => {
-        setEditingHabit(item);
-        setIsHabitModalOpen(true);
-      }}
-      style={styles.habitCard}
-    >
-      <View style={styles.habitMainInfo}>
-        <Text style={styles.habitTitle}>{item.title}</Text>
+  const handleFetchSkillDetails = async (id: string) => {
+    try {
+      const fullSkill = await SkillsApiService.findOne(id);
+      setSkills(prev => prev.map(s => (s.id === id ? fullSkill : s)));
+    } catch {
+      Alert.alert('Error', 'Failed to load skill modules.');
+    }
+  };
 
-        <View style={styles.habitMetaRow}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{item.frequency?.join(', ')}</Text>
-          </View>
-          {item.unit ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {item.targetValue} {item.unit}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
+  const handleToggleModule = async (moduleId: string) => {
+    try {
+      const updatedModule = await SkillsApiService.toggleModule(moduleId);
+      setSkills(prev =>
+        prev.map(skill => ({
+          ...skill,
+          modules: skill.modules?.map(m => (m.id === moduleId ? updatedModule : m)),
+        }))
+      );
+    } catch {
+      Alert.alert('Error', 'Failed to update module status.');
+    }
+  };
 
-      <View style={styles.habitStreakContainer}>
-        <View style={styles.streakBox}>
-          <Flame size={16} color="#F59E0B" />
-          <Text style={styles.streakCount}>{item.currentStreak}</Text>
-          <Text style={styles.streakLabel}>Current</Text>
-        </View>
-
-        <View style={styles.streakDivider} />
-
-        <View style={styles.streakBox}>
-          <Award size={16} color="#6366F1" />
-          <Text style={styles.streakCount}>{item.longestStreak}</Text>
-          <Text style={styles.streakLabel}>Best</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+  const handleDeleteSkill = async (id: string) => {
+    Alert.alert('Delete Skill', 'Are you sure you want to delete this skill and its roadmap?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setSkills(prev => prev.filter(s => s.id !== id));
+            await SkillsApiService.delete(id);
+          } catch {
+            Alert.alert('Error', 'Failed to delete skill.');
+            fetchSkills();
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#0B0F17" />
 
-      <FlatList<Task | Habit>
-        data={mainTab === 'tasks' ? tasks : habits}
+      <AiGeneratingLoader visible={aiGenerating} />
+
+      <FlatList<Task | Skill>
+        data={mainTab === 'tasks' ? tasks : skills}
         keyExtractor={item => item.id}
         renderItem={({ item }) => {
           if (mainTab === 'tasks') {
@@ -189,15 +195,26 @@ export default function TasksScreen() {
               />
             );
           }
-          return renderHabitItem({ item: item as Habit });
+          return (
+            <SkillCard
+              skill={item as Skill}
+              onDelete={handleDeleteSkill}
+              onEdit={s => {
+                setEditingSkill(s);
+                setIsSkillModalOpen(true);
+              }}
+              onToggleModule={handleToggleModule}
+              onFetchDetails={handleFetchSkillDetails}
+            />
+          );
         }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={mainTab === 'tasks' ? fetchTasks : fetchHabits}
-            tintColor="#6366F1"
+            onRefresh={mainTab === 'tasks' ? fetchTasks : fetchSkills}
+            tintColor={isSkillsTab ? '#10B981' : '#6366F1'}
           />
         }
         ListHeaderComponent={
@@ -205,8 +222,10 @@ export default function TasksScreen() {
             {/* Header */}
             <View style={styles.header}>
               <View>
-                <Text style={styles.headerSubtitle}>WORKFLOW</Text>
-                <Text style={styles.headerTitle}>Task Manager</Text>
+                <Text style={[styles.headerSubtitle, isSkillsTab && styles.headerSubtitleSkills]}>
+                  WORKFLOW
+                </Text>
+                <Text style={styles.headerTitle}>Task & Skill Hub</Text>
               </View>
 
               <TouchableOpacity
@@ -217,18 +236,18 @@ export default function TasksScreen() {
                     setEditingTask(null);
                     setIsTaskModalOpen(true);
                   } else {
-                    setEditingHabit(null);
-                    setIsHabitModalOpen(true);
+                    setEditingSkill(null);
+                    setIsSkillModalOpen(true);
                   }
                 }}
               >
                 <LinearGradient
-                  colors={mainTab === 'tasks' ? ['#6366F1', '#4F46E5'] : ['#F59E0B', '#D97706']}
+                  colors={isSkillsTab ? ['#10B981', '#047857'] : ['#6366F1', '#4F46E5']}
                   style={styles.addBtnGradient}
                 >
                   <Plus size={16} color="#FFFFFF" />
                   <Text style={styles.addBtnText}>
-                    {mainTab === 'tasks' ? 'New Task' : 'Log Habit'}
+                    {mainTab === 'tasks' ? 'New Task' : 'Add Skill'}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -237,18 +256,13 @@ export default function TasksScreen() {
             {/* Top Navigation Tabs */}
             <TasksTopTabs activeTab={mainTab} onSelectTab={setMainTab} />
 
-            {/* Contextual AI Insight Banner */}
+            {/* AI Insight Banner */}
             <View style={styles.insightCard}>
               <View style={styles.insightHeader}>
                 <View style={styles.insightTag}>
-                  <Lightbulb size={14} color={mainTab === 'tasks' ? '#818CF8' : '#FBBF24'} />
-                  <Text
-                    style={[
-                      styles.insightTagText,
-                      { color: mainTab === 'tasks' ? '#818CF8' : '#FBBF24' },
-                    ]}
-                  >
-                    {mainTab === 'tasks' ? 'TASK OPTIMIZER' : 'STREAK COACH'}
+                  <Lightbulb size={14} color={isSkillsTab ? '#34D399' : '#818CF8'} />
+                  <Text style={[styles.insightTagText, isSkillsTab && styles.insightTagTextSkills]}>
+                    {mainTab === 'tasks' ? 'TASK OPTIMIZER' : 'AI ROADMAP COACH'}
                   </Text>
                 </View>
                 <Sparkles size={16} color="#64748B" />
@@ -256,20 +270,15 @@ export default function TasksScreen() {
 
               <Text style={styles.insightBody}>
                 {mainTab === 'tasks'
-                  ? 'You have 3 high-priority items pending today. Focus on completing them during your peak energy hours.'
-                  : 'Consistent morning routines boost daily output by 25%. Maintain your top habit streaks this week!'}
+                  ? 'You have high-priority tasks pending today. Complete them during peak focus hours.'
+                  : 'AI decomposes skills into video resources, theory, and exercises to boost learning efficiency.'}
               </Text>
 
               <TouchableOpacity style={styles.insightAction} activeOpacity={0.7}>
-                <Text
-                  style={[
-                    styles.insightActionText,
-                    { color: mainTab === 'tasks' ? '#818CF8' : '#FBBF24' },
-                  ]}
-                >
-                  {mainTab === 'tasks' ? 'Prioritize Schedule' : 'View Analytics'}
+                <Text style={[styles.insightActionText, isSkillsTab && styles.insightActionTextSkills]}>
+                  {mainTab === 'tasks' ? 'Prioritize Schedule' : 'Explore Skill Analytics'}
                 </Text>
-                <ArrowRight size={14} color={mainTab === 'tasks' ? '#818CF8' : '#FBBF24'} />
+                <ArrowRight size={14} color={isSkillsTab ? '#34D399' : '#818CF8'} />
               </TouchableOpacity>
             </View>
 
@@ -314,7 +323,7 @@ export default function TasksScreen() {
         }
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator size="large" color="#6366F1" style={{ marginTop: 40 }} />
+            <ActivityIndicator size="large" color={isSkillsTab ? '#10B981' : '#6366F1'} style={{ marginTop: 40 }} />
           ) : mainTab === 'tasks' ? (
             <View style={styles.emptyContainer}>
               <Sparkles color="#6366F1" size={36} />
@@ -323,9 +332,9 @@ export default function TasksScreen() {
             </View>
           ) : (
             <View style={styles.emptyContainer}>
-              <Sparkles color="#F59E0B" size={36} />
-              <Text style={styles.emptyTitle}>No Habits Tracked Yet</Text>
-              <Text style={styles.emptySub}>Tap "Log Habit" above to start building consistency.</Text>
+              <Sparkles color="#34D399" size={36} />
+              <Text style={styles.emptyTitle}>No Skills Tracked Yet</Text>
+              <Text style={styles.emptySub}>Tap "Add Skill" above to generate an AI roadmap.</Text>
             </View>
           )
         }
@@ -342,15 +351,15 @@ export default function TasksScreen() {
         initialTask={editingTask}
       />
 
-      {/* Habit Modal */}
-      <HabitFormModal
-        visible={isHabitModalOpen}
+      {/* Skill Modal */}
+      <SkillFormModal
+        visible={isSkillModalOpen}
         onClose={() => {
-          setIsHabitModalOpen(false);
-          setEditingHabit(null);
+          setIsSkillModalOpen(false);
+          setEditingSkill(null);
         }}
-        onSubmit={handleHabitSubmit}
-        initialHabit={editingHabit}
+        onSubmit={handleSkillSubmit}
+        initialSkill={editingSkill}
       />
     </SafeAreaView>
   );
@@ -361,38 +370,21 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   headerSubtitle: { fontSize: 11, fontWeight: '800', color: '#6366F1', letterSpacing: 1.5 },
+  headerSubtitleSkills: { color: '#10B981' },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#F8FAFC' },
   addBtnContainer: { borderRadius: 10, overflow: 'hidden' },
   addBtnGradient: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 6 },
   addBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
-
-  // AI Insight Card
-  insightCard: {
-    backgroundColor: '#151C2C',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    marginBottom: 16,
-  },
+  insightCard: { backgroundColor: '#151C2C', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#1E293B', marginBottom: 16 },
   insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   insightTag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  insightTagText: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  insightTagText: { fontSize: 11, fontWeight: '800', letterSpacing: 1, color: '#818CF8' },
+  insightTagTextSkills: { color: '#34D399' },
   insightBody: { fontSize: 13, color: '#94A3B8', lineHeight: 18, marginBottom: 12 },
   insightAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  insightActionText: { fontSize: 12, fontWeight: '700' },
-
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#151C2C',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    marginBottom: 14,
-  },
+  insightActionText: { fontSize: 12, fontWeight: '700', color: '#818CF8' },
+  insightActionTextSkills: { color: '#34D399' },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#151C2C', borderRadius: 12, paddingHorizontal: 14, height: 48, borderWidth: 1, borderColor: '#1E293B', marginBottom: 14 },
   searchInput: { flex: 1, color: '#F8FAFC', fontSize: 14, marginLeft: 10 },
   filterTabs: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   filterTab: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: '#151C2C', borderRadius: 10, borderWidth: 1, borderColor: '#1E293B' },
@@ -402,43 +394,4 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50 },
   emptyTitle: { color: '#F8FAFC', fontSize: 16, fontWeight: '700', marginTop: 12 },
   emptySub: { color: '#64748B', fontSize: 13, marginTop: 4 },
-
-  // Habit Card Styles
-  habitCard: {
-    backgroundColor: '#151C2C',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  habitMainInfo: { flex: 1, marginRight: 12 },
-  habitTitle: { fontSize: 16, fontWeight: '700', color: '#F8FAFC', marginBottom: 8 },
-  habitMetaRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  badge: {
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  badgeText: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
-  habitStreakContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0B0F17',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-  },
-  streakBox: { alignItems: 'center', minWidth: 44 },
-  streakCount: { color: '#F8FAFC', fontSize: 14, fontWeight: '800', marginTop: 2 },
-  streakLabel: { color: '#64748B', fontSize: 9, fontWeight: '600' },
-  streakDivider: { width: 1, height: 24, backgroundColor: '#1E293B', marginHorizontal: 8 },
 });

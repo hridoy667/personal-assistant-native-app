@@ -159,7 +159,7 @@ export const authApi = {
   /**
    * Update profile (PATCH /auth/update - Multipart/Form-Data)
    */
-  updateProfile: async (
+ updateProfile: async (
   payload: UpdateAuthPayload,
   image?: UpdateAuthPayload['image']
 ): Promise<AuthUser> => {
@@ -176,6 +176,17 @@ export const authApi = {
   if (payload.dateOfBirth !== undefined && payload.dateOfBirth !== null) formData.append('dateOfBirth', payload.dateOfBirth);
   if (payload.dailyTargetFocus !== undefined && payload.dailyTargetFocus !== null) {
     formData.append('dailyTargetFocus', payload.dailyTargetFocus);
+  }
+
+  // Routine & Personality Fields
+  if (payload.defaultWakeTime !== undefined && payload.defaultWakeTime !== null) {
+    formData.append('defaultWakeTime', payload.defaultWakeTime);
+  }
+  if (payload.defaultSleepTime !== undefined && payload.defaultSleepTime !== null) {
+    formData.append('defaultSleepTime', payload.defaultSleepTime);
+  }
+  if (payload.personalityType !== undefined && payload.personalityType !== null) {
+    formData.append('personalityType', payload.personalityType);
   }
 
   // Enums & Health Metrics

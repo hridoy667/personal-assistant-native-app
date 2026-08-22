@@ -1,3 +1,25 @@
+export type PersonalityType =
+  // Analysts
+  | 'INTJ_ARCHITECT'
+  | 'INTP_LOGICIAN'
+  | 'ENTJ_COMMANDER'
+  | 'ENTP_DEBATER'
+  // Diplomats
+  | 'INFJ_ADVOCATE'
+  | 'INFP_MEDIATOR'
+  | 'ENFJ_PROTAGONIST'
+  | 'ENFP_CAMPAIGNER'
+  // Sentinels
+  | 'ISTJ_LOGISTICIAN'
+  | 'ISFJ_DEFENDER'
+  | 'ESTJ_EXECUTIVE'
+  | 'ESFJ_CONSUL'
+  // Explorers
+  | 'ISTP_VIRTUSO'
+  | 'ISFP_ADVENTURER'
+  | 'ESTP_ENTREPRENEUR'
+  | 'ESFP_ENTERTAINER';
+
 export interface CheckPhoneResponse {
   success: boolean;
   message: string;
@@ -54,8 +76,9 @@ export interface AuthUser {
   activityLevel?: 'SEDENTARY' | 'LIGHTLY_ACTIVE' | 'MODERATELY_ACTIVE' | 'VERY_ACTIVE' | string;
   dailyTargetFocus?: string | null;
   timezone?: string;
-  timzone?: string; // Accounts for backend payload key spelling variant
-
+  defaultWakeTime?: string; // HH:mm format (e.g. "06:00")
+  defaultSleepTime?: string; // HH:mm format (e.g. "23:00")
+  personalityType?: PersonalityType | null;
   // Feature Flags
   enableIslamicFeatures?: boolean;
   enableMailAssistance?: boolean;
@@ -136,6 +159,9 @@ export interface UpdateAuthPayload {
   upazila?: string;
   location?: string;
   timezone?: string;
+  defaultWakeTime?: string; // HH:mm format (e.g. "06:00")
+  defaultSleepTime?: string; // HH:mm format (e.g. "23:00")
+  personalityType?: PersonalityType | null;
   dateOfBirth?: string;
   gender?: 'MALE' | 'FEMALE' | null;
   height?: number | null;

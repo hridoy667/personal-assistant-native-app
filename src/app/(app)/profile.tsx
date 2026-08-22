@@ -1,4 +1,3 @@
-// src/app/(app)/profile.tsx
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +20,8 @@ import {
   Calendar,
   Camera,
   Check,
+  ChevronDown,
+  Clock,
   Lock,
   MapPin,
   Pencil,
@@ -34,6 +35,43 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { authApi } from '@/services/authapi';
 import { AuthUser, UpdateAuthPayload } from '@/types/auth';
+
+export type PersonalityType =
+  | 'INTJ_ARCHITECT'
+  | 'INTP_LOGICIAN'
+  | 'ENTJ_COMMANDER'
+  | 'ENTP_DEBATER'
+  | 'INFJ_ADVOCATE'
+  | 'INFP_MEDIATOR'
+  | 'ENFJ_PROTAGONIST'
+  | 'ENFP_CAMPAIGNER'
+  | 'ISTJ_LOGISTICIAN'
+  | 'ISFJ_DEFENDER'
+  | 'ESTJ_EXECUTIVE'
+  | 'ESFJ_CONSUL'
+  | 'ISTP_VIRTUSO'
+  | 'ISFP_ADVENTURER'
+  | 'ESTP_ENTREPRENEUR'
+  | 'ESFP_ENTERTAINER';
+
+const PERSONALITY_TYPES: PersonalityType[] = [
+  'INTJ_ARCHITECT',
+  'INTP_LOGICIAN',
+  'ENTJ_COMMANDER',
+  'ENTP_DEBATER',
+  'INFJ_ADVOCATE',
+  'INFP_MEDIATOR',
+  'ENFJ_PROTAGONIST',
+  'ENFP_CAMPAIGNER',
+  'ISTJ_LOGISTICIAN',
+  'ISFJ_DEFENDER',
+  'ESTJ_EXECUTIVE',
+  'ESFJ_CONSUL',
+  'ISTP_VIRTUSO',
+  'ISFP_ADVENTURER',
+  'ESTP_ENTREPRENEUR',
+  'ESFP_ENTERTAINER',
+];
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -50,6 +88,17 @@ export default function ProfileScreen() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [bio, setBio] = useState('');
+
+  // Schedule & Personality
+  const [defaultWakeTime, setDefaultWakeTime] = useState('');
+  const [defaultSleepTime, setDefaultSleepTime] = useState('');
+  const [wakeTimeDate, setWakeTimeDate] = useState<Date>(new Date(2024, 0, 1, 6, 0));
+  const [sleepTimeDate, setSleepTimeDate] = useState<Date>(new Date(2024, 0, 1, 23, 0));
+  const [showWakePicker, setShowWakePicker] = useState(false);
+  const [showSleepPicker, setShowSleepPicker] = useState(false);
+
+  const [personalityType, setPersonalityType] = useState<PersonalityType | null>(null);
+  const [showPersonalityDropdown, setShowPersonalityDropdown] = useState(false);
 
   // DOB States
   const [dobDate, setDobDate] = useState<Date | null>(null);
@@ -68,8 +117,8 @@ export default function ProfileScreen() {
   const [dailyTargetFocus, setDailyTargetFocus] = useState('');
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | ''>('');
   const [activityLevel, setActivityLevel] = useState<
-  'SEDENTARY' | 'LIGHTLY_ACTIVE' | 'MODERATELY_ACTIVE' | 'VERY_ACTIVE' | ''
->('');
+    'SEDENTARY' | 'LIGHTLY_ACTIVE' | 'MODERATELY_ACTIVE' | 'VERY_ACTIVE' | ''
+  >('');
 
   // Feature Toggles
   const [enableIslamicFeatures, setEnableIslamicFeatures] = useState(false);
@@ -90,14 +139,30 @@ export default function ProfileScreen() {
     fetchProfile();
   }, []);
 
-  // FIXED: build the YYYY-MM-DD string from LOCAL date parts, not UTC.
-  // toISOString() shifts to UTC which caused the "select 15th, save as 14th" bug
-  // for timezones ahead of UTC (e.g. Asia/Dhaka, UTC+6).
   const formatLocalDate = (date: Date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const formatTimeString = (date: Date) => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const parseTimeStringToDate = (timeStr?: string) => {
+    if (!timeStr) return new Date(2024, 0, 1, 8, 0);
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      if (!isNaN(h) && !isNaN(m)) {
+        return new Date(2024, 0, 1, h, m);
+      }
+    }
+    return new Date(2024, 0, 1, 8, 0);
   };
 
   const fetchProfile = async () => {
@@ -108,14 +173,18 @@ export default function ProfileScreen() {
 
       setUser(data);
 
-      // Pre-fill form fields
       setName(data.name || '');
       setPhone(data.phone || '');
       setBio(data.bio || '');
 
-      // Parse Date of Birth
+      // Schedule & Personality Sync
+      setDefaultWakeTime(data.defaultWakeTime || '');
+      setDefaultSleepTime(data.defaultSleepTime || '');
+      setWakeTimeDate(parseTimeStringToDate(data.defaultWakeTime));
+      setSleepTimeDate(parseTimeStringToDate(data.defaultSleepTime));
+      setPersonalityType(data.personalityType || null);
+
       if (data.dateOfBirth) {
-        // Parse as local date, not UTC, to avoid the same off-by-one issue on read
         const [y, m, d] = String(data.dateOfBirth).split('T')[0].split('-').map(Number);
         if (y && m && d) {
           setDobDate(new Date(y, m - 1, d));
@@ -130,9 +199,8 @@ export default function ProfileScreen() {
       setDistrict(data.district || '');
       setUpazila(data.upazila || '');
       setLocation(data.location || '');
-      setTimezone(data.timezone || data.timzone || 'Asia/Dhaka');
+      setTimezone(data.timezone || 'Asia/Dhaka');
 
-      // Parse Height (e.g. 5'10" or numeric metres fallback)
       if (data.height && !isNaN(Number(data.height))) {
         const heightMeters = Number(data.height);
         const totalInches = Math.round(heightMeters / 0.0254);
@@ -154,7 +222,6 @@ export default function ProfileScreen() {
           | 'VERY_ACTIVE') || 'SEDENTARY'
       );
 
-      // Feature Toggles
       setEnableIslamicFeatures(!!data.enableIslamicFeatures);
       setEnableMailAssistance(!!data.enableMailAssistance);
       setEnableFinanceTracker(data.enableFinanceTracker ?? true);
@@ -169,25 +236,32 @@ export default function ProfileScreen() {
   };
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (selectedDate) setDobDate(selectedDate);
+  };
+
+  const handleWakeTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') setShowWakePicker(false);
     if (selectedDate) {
-      setDobDate(selectedDate);
+      setWakeTimeDate(selectedDate);
+      setDefaultWakeTime(formatTimeString(selectedDate));
+    }
+  };
+
+  const handleSleepTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') setShowSleepPicker(false);
+    if (selectedDate) {
+      setSleepTimeDate(selectedDate);
+      setDefaultSleepTime(formatTimeString(selectedDate));
     }
   };
 
   const handlePickImage = async () => {
     if (!isEditing) return;
 
-    const permissionResult =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert(
-        'Permission Denied',
-        'Permission to access media library is required to change profile picture.'
-      );
+      Alert.alert('Permission Denied', 'Permission to access media library is required.');
       return;
     }
 
@@ -204,11 +278,7 @@ export default function ProfileScreen() {
       const match = /\.(\w+)$/.exec(fileName);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-      setSelectedImage({
-        uri: asset.uri,
-        name: fileName,
-        type,
-      });
+      setSelectedImage({ uri: asset.uri, name: fileName, type });
     }
   };
 
@@ -221,13 +291,16 @@ export default function ProfileScreen() {
     setUpdating(true);
     try {
       const formattedDob = dobDate ? formatLocalDate(dobDate) : undefined;
-
       const totalInches = heightFeet * 12 + heightInches;
       const heightInMeters = parseFloat((totalInches * 0.0254).toFixed(2));
+
       const payload: UpdateAuthPayload = {
         name,
         phone: phone.trim() || undefined,
         bio: bio.trim() || undefined,
+        defaultWakeTime: defaultWakeTime || formatTimeString(wakeTimeDate),
+        defaultSleepTime: defaultSleepTime || formatTimeString(sleepTimeDate),
+        personalityType: personalityType || null,
         dateOfBirth: formattedDob,
         district: district.trim() || undefined,
         upazila: upazila.trim() || undefined,
@@ -238,11 +311,7 @@ export default function ProfileScreen() {
         dailyTargetFocus: dailyTargetFocus.trim() || undefined,
         gender: gender ? (gender as 'MALE' | 'FEMALE') : null,
         activityLevel: activityLevel
-          ? (activityLevel as
-              | 'SEDENTARY'
-              | 'LIGHTLY_ACTIVE'
-              | 'MODERATELY_ACTIVE'
-              | 'VERY_ACTIVE')
+          ? (activityLevel as 'SEDENTARY' | 'LIGHTLY_ACTIVE' | 'MODERATELY_ACTIVE' | 'VERY_ACTIVE')
           : undefined,
         enableIslamicFeatures,
         enableMailAssistance,
@@ -258,7 +327,11 @@ export default function ProfileScreen() {
       setUser(updatedUser);
       setSelectedImage(null);
       setIsEditing(false);
+      setShowPersonalityDropdown(false);
       Alert.alert('Success', 'Profile updated successfully!');
+      
+      // Sync State back with Updated User
+      fetchProfile();
     } catch (error: any) {
       Alert.alert('Update Failed', error?.message || 'Could not update profile.');
     } finally {
@@ -269,7 +342,7 @@ export default function ProfileScreen() {
   const handleCancelEdit = () => {
     setSelectedImage(null);
     setIsEditing(false);
-    // revert any unsaved changes back to server state
+    setShowPersonalityDropdown(false);
     fetchProfile();
   };
 
@@ -293,13 +366,8 @@ export default function ProfileScreen() {
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Top Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
           <ArrowLeft size={20} color="#f8fafc" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
@@ -308,52 +376,33 @@ export default function ProfileScreen() {
           onPress={() => (isEditing ? handleCancelEdit() : setIsEditing(true))}
           activeOpacity={0.7}
         >
-          {isEditing ? (
-            <X size={18} color="#f8fafc" />
-          ) : (
-            <Pencil size={16} color="#f8fafc" />
-          )}
+          {isEditing ? <X size={18} color="#f8fafc" /> : <Pencil size={16} color="#f8fafc" />}
         </TouchableOpacity>
       </View>
 
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + 32 },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Avatar Section */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
             <Image source={{ uri: avatarUri }} style={styles.avatar} />
             {isEditing && (
-              <TouchableOpacity
-                style={styles.cameraBadge}
-                onPress={handlePickImage}
-                activeOpacity={0.8}
-              >
+              <TouchableOpacity style={styles.cameraBadge} onPress={handlePickImage} activeOpacity={0.8}>
                 <Camera size={16} color="#ffffff" />
               </TouchableOpacity>
             )}
           </View>
-          {isEditing && (
-            <Text style={styles.changePhotoText}>Tap camera icon to change photo</Text>
-          )}
+          {isEditing && <Text style={styles.changePhotoText}>Tap camera icon to change photo</Text>}
         </View>
 
-        {/* Section: Basic Details */}
         <Text style={styles.sectionTitle}>Basic Details</Text>
 
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Email Address (Read-Only)</Text>
           <View style={[styles.inputContainer, styles.disabledInput]}>
-            <TextInput
-              style={[styles.input, { color: '#64748b' }]}
-              value={user?.email || ''}
-              editable={false}
-            />
+            <TextInput style={[styles.input, { color: '#64748b' }]} value={user?.email || ''} editable={false} />
             <Lock size={16} color="#64748b" />
           </View>
         </View>
@@ -388,7 +437,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Date of Birth Picker Field */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Date of Birth</Text>
           <TouchableOpacity
@@ -413,10 +461,7 @@ export default function ProfileScreen() {
                 onChange={handleDateChange}
               />
               {Platform.OS === 'ios' && (
-                <TouchableOpacity
-                  onPress={() => setShowDatePicker(false)}
-                  style={styles.datePickerDoneButton}
-                >
+                <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.datePickerDoneButton}>
                   <Text style={styles.datePickerDoneText}>Done</Text>
                 </TouchableOpacity>
               )}
@@ -438,6 +483,118 @@ export default function ProfileScreen() {
               editable={isEditing}
             />
           </View>
+        </View>
+
+        {/* Section: Routine & Personality */}
+        <Text style={styles.sectionTitle}>Routine & Personality</Text>
+
+        <View style={styles.rowFields}>
+          {/* Wake Time Picker */}
+          <View style={[styles.fieldGroup, { flex: 1 }]}>
+            <Text style={styles.label}>Wake Time</Text>
+            <TouchableOpacity
+              onPress={() => isEditing && setShowWakePicker(true)}
+              activeOpacity={0.7}
+              style={[styles.inputContainer, !isEditing && styles.disabledInput]}
+              disabled={!isEditing}
+            >
+              <Clock size={16} color="#64748b" style={{ marginRight: 6 }} />
+              <Text style={styles.input}>
+                {defaultWakeTime || formatTimeString(wakeTimeDate)}
+              </Text>
+            </TouchableOpacity>
+
+            {isEditing && showWakePicker && (
+              <View style={styles.datePickerContainer}>
+                <DateTimePicker
+                  value={wakeTimeDate}
+                  mode="time"
+                  is24Hour={true}
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleWakeTimeChange}
+                />
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity onPress={() => setShowWakePicker(false)} style={styles.datePickerDoneButton}>
+                    <Text style={styles.datePickerDoneText}>Done</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Sleep Time Picker */}
+          <View style={[styles.fieldGroup, { flex: 1 }]}>
+            <Text style={styles.label}>Sleep Time</Text>
+            <TouchableOpacity
+              onPress={() => isEditing && setShowSleepPicker(true)}
+              activeOpacity={0.7}
+              style={[styles.inputContainer, !isEditing && styles.disabledInput]}
+              disabled={!isEditing}
+            >
+              <Clock size={16} color="#64748b" style={{ marginRight: 6 }} />
+              <Text style={styles.input}>
+                {defaultSleepTime || formatTimeString(sleepTimeDate)}
+              </Text>
+            </TouchableOpacity>
+
+            {isEditing && showSleepPicker && (
+              <View style={styles.datePickerContainer}>
+                <DateTimePicker
+                  value={sleepTimeDate}
+                  mode="time"
+                  is24Hour={true}
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleSleepTimeChange}
+                />
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity onPress={() => setShowSleepPicker(false)} style={styles.datePickerDoneButton}>
+                    <Text style={styles.datePickerDoneText}>Done</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Personality Dropdown */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Personality Type</Text>
+          <TouchableOpacity
+            style={[styles.dropdownContainer, !isEditing && styles.disabledInput]}
+            onPress={() => isEditing && setShowPersonalityDropdown(!showPersonalityDropdown)}
+            activeOpacity={0.8}
+            disabled={!isEditing}
+          >
+            <Text style={styles.dropdownText}>
+              {personalityType ? personalityType.replace('_', ' ') : 'Select Personality Type'}
+            </Text>
+            <ChevronDown size={18} color="#64748b" />
+          </TouchableOpacity>
+
+          {isEditing && showPersonalityDropdown && (
+            <View style={styles.dropdownMenu}>
+              <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                {PERSONALITY_TYPES.map((type) => {
+                  const isSelected = personalityType === type;
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
+                      onPress={() => {
+                        setPersonalityType(isSelected ? null : type);
+                        setShowPersonalityDropdown(false);
+                      }}
+                    >
+                      <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}>
+                        {type.replace('_', ' ')}
+                      </Text>
+                      {isSelected && <Check size={16} color="#3b82f6" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
         </View>
 
         {/* Section: Location Details */}
@@ -507,12 +664,10 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Health & Daily Focus</Text>
 
         <View style={styles.rowFields}>
-          {/* Height Selection */}
           <View style={[styles.fieldGroup, { flex: 1.6 }]}>
             <Text style={styles.label}>Height</Text>
             {isEditing ? (
               <View style={styles.heightPickerRow}>
-                {/* Feet Selector */}
                 <View style={styles.heightSegment}>
                   <Ruler color="#64748b" size={14} />
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSelector}>
@@ -530,7 +685,6 @@ export default function ProfileScreen() {
                   </ScrollView>
                 </View>
 
-                {/* Inches Selector */}
                 <View style={styles.heightSegment}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSelector}>
                     {Array.from({ length: 12 }, (_, i) => i).map((inch) => (
@@ -555,7 +709,6 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {/* Weight Input */}
           <View style={[styles.fieldGroup, { flex: 1 }]}>
             <Text style={styles.label}>Weight</Text>
             <View style={[styles.weightInputContainer, !isEditing && styles.disabledInput]}>
@@ -602,14 +755,7 @@ export default function ProfileScreen() {
                 onPress={() => isEditing && setGender(g)}
                 disabled={!isEditing}
               >
-                <Text
-                  style={[
-                    styles.pillText,
-                    gender === g && styles.pillTextActive,
-                  ]}
-                >
-                  {g}
-                </Text>
+                <Text style={[styles.pillText, gender === g && styles.pillTextActive]}>{g}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -618,14 +764,7 @@ export default function ProfileScreen() {
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Activity Level</Text>
           <View style={styles.pillWrap}>
-            {(
-              [
-                'SEDENTARY',
-                'LIGHTLY_ACTIVE',
-                'MODERATELY_ACTIVE',
-                'VERY_ACTIVE',
-              ] as const
-            ).map((level) => (
+            {(['SEDENTARY', 'LIGHTLY_ACTIVE', 'MODERATELY_ACTIVE', 'VERY_ACTIVE'] as const).map((level) => (
               <TouchableOpacity
                 key={level}
                 style={[
@@ -636,12 +775,7 @@ export default function ProfileScreen() {
                 onPress={() => isEditing && setActivityLevel(level)}
                 disabled={!isEditing}
               >
-                <Text
-                  style={[
-                    styles.pillText,
-                    activityLevel === level && styles.pillTextActive,
-                  ]}
-                >
+                <Text style={[styles.pillText, activityLevel === level && styles.pillTextActive]}>
                   {level.replace('_', ' ')}
                 </Text>
               </TouchableOpacity>
@@ -649,7 +783,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Section: Feature Toggles */}
         <Text style={styles.sectionTitle}>Application Features</Text>
 
         <View style={styles.switchRow}>
@@ -718,7 +851,6 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Save Button - only visible while editing */}
         {isEditing && (
           <TouchableOpacity
             style={[styles.saveButton, updating && styles.disabledButton]}
@@ -1004,5 +1136,48 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '600',
+  },
+  dropdownContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  dropdownText: {
+    color: '#f8fafc',
+    fontSize: 14,
+  },
+  dropdownMenu: {
+    backgroundColor: '#0f172a',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+  },
+  dropdownItemActive: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  dropdownItemText: {
+    color: '#94a3b8',
+    fontSize: 13,
+  },
+  dropdownItemTextActive: {
+    color: '#3b82f6',
+    fontWeight: 'bold',
   },
 });

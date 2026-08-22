@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { CheckSquare, Flame } from 'lucide-react-native';
+import { CheckSquare, Sparkles } from 'lucide-react-native';
 
-export type TaskMainTab = 'tasks' | 'habits';
+export type TaskMainTab = 'tasks' | 'skills';
 
 interface TasksTopTabsProps {
   activeTab: TaskMainTab;
@@ -15,41 +15,49 @@ export const TasksTopTabs: React.FC<TasksTopTabsProps> = ({
 }) => {
   return (
     <View style={styles.container}>
+      {/* Tasks Tab */}
       <TouchableOpacity
-        style={[styles.tab, activeTab === 'tasks' && styles.activeTab]}
+        style={[
+          styles.tab,
+          activeTab === 'tasks' && styles.activeTaskTab,
+        ]}
         onPress={() => onSelectTab('tasks')}
         activeOpacity={0.8}
       >
         <CheckSquare
           size={16}
-          color={activeTab === 'tasks' ? '#F8FAFC' : '#64748B'}
+          color={activeTab === 'tasks' ? '#818CF8' : '#64748B'}
         />
         <Text
           style={[
             styles.tabText,
-            activeTab === 'tasks' && styles.activeTabText,
+            activeTab === 'tasks' && styles.activeTaskTabText,
           ]}
         >
           Tasks
         </Text>
       </TouchableOpacity>
 
+      {/* Skills Tab */}
       <TouchableOpacity
-        style={[styles.tab, activeTab === 'habits' && styles.activeTab]}
-        onPress={() => onSelectTab('habits')}
+        style={[
+          styles.tab,
+          activeTab === 'skills' && styles.activeSkillTab,
+        ]}
+        onPress={() => onSelectTab('skills')}
         activeOpacity={0.8}
       >
-        <Flame
+        <Sparkles
           size={16}
-          color={activeTab === 'habits' ? '#F59E0B' : '#64748B'}
+          color={activeTab === 'skills' ? '#34D399' : '#64748B'}
         />
         <Text
           style={[
             styles.tabText,
-            activeTab === 'habits' && styles.activeTabText,
+            activeTab === 'skills' && styles.activeSkillTabText,
           ]}
         >
-          Habits
+          Skills
         </Text>
       </TouchableOpacity>
     </View>
@@ -74,18 +82,30 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 10,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
-  activeTab: {
-    backgroundColor: '#312E81',
+  /* Tasks Active Styles (Indigo Theme) */
+  activeTaskTab: {
+    backgroundColor: '#312E8140',
     borderColor: '#6366F1',
+  },
+  activeTaskTabText: {
+    color: '#818CF8',
+    fontWeight: '700',
+  },
+  /* Skills Active Styles (Emerald Theme) */
+  activeSkillTab: {
+    backgroundColor: '#064E3B40',
+    borderColor: '#10B981',
+  },
+  activeSkillTabText: {
+    color: '#34D399',
+    fontWeight: '700',
   },
   tabText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#64748B',
-  },
-  activeTabText: {
-    color: '#F8FAFC',
-    fontWeight: '700',
   },
 });

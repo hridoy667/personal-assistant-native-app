@@ -28,6 +28,7 @@ import { getCachedLocation } from '@/lib/locationCache';
 import { ActivityLoggerModal } from '@/components/modals/ActivityLoggerModal';
 import { MoodLoggerModal } from '@/components/modals/MoodLoggerModal';
 import { ScreenTimeCard } from '@/components/cards/ScreenTimeCard';
+import { HabitSectionCard } from '@/components/cards/HabitSectionCard';
 
 type WellbeingMainTab = 'activity' | 'mood';
 
@@ -161,7 +162,7 @@ export default function WellbeingScreen() {
             <Text style={styles.headerTitle}>Wellbeing & Vitals</Text>
           </View>
 
-          {/* Dynamic Action Button synced with Active Main Tab */}
+          {/* Action Button */}
           <TouchableOpacity
             activeOpacity={0.85}
             style={styles.addBtnContainer}
@@ -261,12 +262,7 @@ export default function WellbeingScreen() {
         {/* TAB 1: ACTIVITY CONTENT */}
         {mainTab === 'activity' ? (
           <>
-            {/* Screen Time Tracker */}
-            <View style={styles.cardWrapper}>
-              <ScreenTimeCard />
-            </View>
-
-            {/* Daily Energy & Hydration Balance */}
+            {/* 1. Daily Energy & Hydration Balance */}
             <LinearGradient
               colors={['#1E1B4B', '#0F172A']}
               start={{ x: 0, y: 0 }}
@@ -303,7 +299,15 @@ export default function WellbeingScreen() {
               ) : null}
             </LinearGradient>
 
-            {/* Environmental & Activity Insights */}
+            {/* 2. Screen Time Tracker */}
+            <View style={styles.cardWrapper}>
+              <ScreenTimeCard />
+            </View>
+
+            {/* 3. Daily Habits Section */}
+            <HabitSectionCard onHabitChange={fetchWellbeing} />
+
+            {/* 4. Environmental & Activity Insights */}
             {hasInsightsOrAlerts && (
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
@@ -311,7 +315,6 @@ export default function WellbeingScreen() {
                   <Text style={styles.cardTitle}>Environmental & Activity Insights</Text>
                 </View>
 
-                {/* Weather Alerts */}
                 {weatherAlerts.map((alert, index) => (
                   <View key={`alert-${index}`} style={styles.insightItem}>
                     <Text style={styles.alertTitle}>⚠️ {alert.event}</Text>
@@ -319,7 +322,6 @@ export default function WellbeingScreen() {
                   </View>
                 ))}
 
-                {/* Workout Advisory */}
                 {workout && (
                   <View style={styles.insightItem}>
                     <Text style={styles.subSectionTitle}>Workout Advisory</Text>
@@ -336,7 +338,6 @@ export default function WellbeingScreen() {
                   </View>
                 )}
 
-                {/* Health Insights List */}
                 {healthInsights.map((insight, index) => (
                   <View key={`insight-${index}`} style={styles.insightItem}>
                     <View style={styles.insightHeader}>
@@ -382,7 +383,7 @@ export default function WellbeingScreen() {
         )}
       </ScrollView>
 
-      {/* Reusable Modals */}
+      {/* Modals */}
       <ActivityLoggerModal
         visible={showActivityModal}
         onClose={() => setShowActivityModal(false)}
@@ -398,21 +399,9 @@ export default function WellbeingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0f17',
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
-  },
-  centerContainer: {
-    flex: 1,
-    backgroundColor: '#0B0F17',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#0b0f17' },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
+  centerContainer: { flex: 1, backgroundColor: '#0B0F17', alignItems: 'center', justifyContent: 'center' },
   loadingText: { color: '#94A3B8', marginTop: 12, fontSize: 14 },
   errorSafeArea: { flex: 1, backgroundColor: '#0B0F17' },
   errorContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
@@ -423,8 +412,7 @@ const styles = StyleSheet.create({
   primaryBtn: { width: '100%', height: 52, borderRadius: 12, overflow: 'hidden' },
   btnGradient: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   primaryBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  
-  // Header
+
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   headerSubtitle: { fontSize: 11, fontWeight: '800', color: '#6366F1', letterSpacing: 1.5 },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#F8FAFC' },
@@ -432,7 +420,6 @@ const styles = StyleSheet.create({
   addBtnGradient: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 6 },
   addBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
 
-  // Tabs
   tabsContainer: {
     flexDirection: 'row',
     backgroundColor: '#151C2C',
@@ -442,36 +429,12 @@ const styles = StyleSheet.create({
     borderColor: '#1E293B',
     marginBottom: 16,
   },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-  },
-  activeTabButton: {
-    backgroundColor: '#312E81',
-  },
-  tabButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  activeTabButtonText: {
-    color: '#F8FAFC',
-    fontWeight: '700',
-  },
+  tabButton: { flex: 1, flexDirection: 'row', paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  activeTabButton: { backgroundColor: '#312E81' },
+  tabButtonText: { fontSize: 13, fontWeight: '600', color: '#94A3B8' },
+  activeTabButtonText: { color: '#F8FAFC', fontWeight: '700' },
 
-  // AI Insight Card
-  insightCard: {
-    backgroundColor: '#151C2C',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    marginBottom: 16,
-  },
+  insightCard: { backgroundColor: '#151C2C', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#1E293B', marginBottom: 16 },
   insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   insightTag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   insightTagText: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
@@ -479,13 +442,12 @@ const styles = StyleSheet.create({
   insightAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   insightActionText: { fontSize: 12, fontWeight: '700' },
 
-  // Cards
   heroCard: { borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#312E81' },
   heroTitle: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
   heroBadge: { fontSize: 11, color: '#A5B4FC', backgroundColor: '#312E81', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, fontWeight: '700' },
   heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   divider: { height: 1, backgroundColor: '#312E81', marginVertical: 14 },
-  
+
   metricsGrid: { flexDirection: 'row', alignItems: 'center' },
   verticalDivider: { width: 1, backgroundColor: '#312E81', height: '100%', marginHorizontal: 12 },
   energyInfo: { flex: 1 },
@@ -494,22 +456,14 @@ const styles = StyleSheet.create({
   hydrationValue: { fontSize: 20, fontWeight: '800', color: '#38BDF8' },
   unit: { fontSize: 11, color: '#94A3B8', fontWeight: '400' },
   tdeeNote: { fontSize: 12, color: '#C7D2FE', marginTop: 12 },
-  
-  cardWrapper: {
-    marginBottom: 16,
-  },
+
+  cardWrapper: { marginBottom: 16 },
   card: { backgroundColor: '#151C2C', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#1E293B' },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   cardIcon: { fontSize: 18, marginRight: 8 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#F1F5F9' },
-  
-  // Insights Styles
-  insightItem: {
-    marginTop: 8,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#1E293B',
-  },
+
+  insightItem: { marginTop: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1E293B' },
   subSectionTitle: { fontSize: 12, fontWeight: '700', color: '#6366F1', marginBottom: 4, textTransform: 'uppercase' },
   alertTitle: { fontSize: 13, fontWeight: '700', color: '#EF4444', marginBottom: 4 },
   advisoryStatus: { fontSize: 13, color: '#CBD5E1', marginBottom: 4 },
@@ -519,27 +473,8 @@ const styles = StyleSheet.create({
   levelHigh: { color: '#EF4444', backgroundColor: '#451A03' },
   levelMedium: { color: '#F59E0B', backgroundColor: '#451A03' },
 
-  // Mood Tab Content
-  moodContainer: {
-    marginTop: 4,
-  },
-  moodSummaryText: {
-    fontSize: 13,
-    color: '#94A3B8',
-    lineHeight: 18,
-    marginBottom: 16,
-  },
-  logMoodOutlineBtn: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#059669',
-    backgroundColor: '#064E3B20',
-  },
-  logMoodOutlineBtnText: {
-    color: '#34D399',
-    fontWeight: '700',
-    fontSize: 13,
-  },
+  moodContainer: { marginTop: 4 },
+  moodSummaryText: { fontSize: 13, color: '#94A3B8', lineHeight: 18, marginBottom: 16 },
+  logMoodOutlineBtn: { paddingVertical: 12, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#059669', backgroundColor: '#064E3B20' },
+  logMoodOutlineBtnText: { color: '#34D399', fontWeight: '700', fontSize: 13 },
 });
