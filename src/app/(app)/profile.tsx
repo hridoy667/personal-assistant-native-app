@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import * as Location from 'expo-location';
 import {
   ArrowLeft,
   Calendar,
@@ -80,7 +81,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [updating, setUpdating] = useState<boolean>(false);
   const [user, setUser] = useState<AuthUser | null>(null);
-
+  const [fetchingLocation, setFetchingLocation] = useState(false);
   // Edit mode
   const [isEditing, setIsEditing] = useState<boolean>(false);
 
@@ -105,8 +106,6 @@ export default function ProfileScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Location Information
-  const [district, setDistrict] = useState('');
-  const [upazila, setUpazila] = useState('');
   const [location, setLocation] = useState('');
   const [timezone, setTimezone] = useState('');
 
@@ -220,8 +219,6 @@ export default function ProfileScreen() {
         }
       }
 
-      setDistrict(data.district || '');
-      setUpazila(data.upazila || '');
       setLocation(data.location || '');
       setTimezone(data.timezone || 'Asia/Dhaka');
 
@@ -256,6 +253,74 @@ export default function ProfileScreen() {
       Alert.alert('Error', error?.message || 'Failed to fetch user profile.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGetGPSLocation = async () => {
+    try {
+      setFetchingLocation(true);
+
+      // 1. Request GPS Permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Permission to access location was denied');
+        return;
+      }
+
+      // 2. Fetch coordinates
+      let currentLoc = await Location.getLastKnownPositionAsync();
+      if (!currentLoc) {
+        currentLoc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+      }
+
+      if (!currentLoc) {
+        alert('Could not retrieve GPS coordinates.');
+        return;
+      }
+
+      const { latitude, longitude } = currentLoc.coords;
+
+      // 3. Query OpenStreetMap Nominatim for exact Upazila / Town
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
+        {
+          headers: {
+            'User-Agent': 'WeatherApp/1.0', // Nominatim requires a custom User-Agent header
+          },
+        }
+      );
+      const data = await response.json();
+
+      const addr = data.address || {};
+
+      // 4. Resolve exact place name (Prioritizing Upazila/Town level over District/Division)
+      const placeName =
+        addr.subdistrict ||
+        addr.town ||
+        addr.county ||
+        addr.municipality ||
+        addr.city ||
+        addr.district ||
+        '';
+
+      const countryCode = (addr.country_code || 'bd').toUpperCase();
+
+      // Clean up word "Upazila" if included in string
+      const cleanPlaceName = placeName.replace(/\s*Upazila\s*/i, '').trim();
+
+      // 5. Update location state (e.g. "Bera, BD")
+      if (cleanPlaceName) {
+        setLocation(`${cleanPlaceName}, ${countryCode}`);
+      } else {
+        setLocation(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`);
+      }
+    } catch (error) {
+      console.error('GPS Location error:', error);
+      alert('Failed to fetch precise location.');
+    } finally {
+      setFetchingLocation(false);
     }
   };
 
@@ -326,8 +391,6 @@ export default function ProfileScreen() {
         defaultSleepTime: defaultSleepTime || formatTime24Hour(sleepTimeDate),
         personalityType: personalityType || null,
         dateOfBirth: formattedDob,
-        district: district.trim() || undefined,
-        upazila: upazila.trim() || undefined,
         location: location.trim() || undefined,
         timezone: timezone.trim() || undefined,
         height: heightInMeters,
@@ -354,7 +417,7 @@ export default function ProfileScreen() {
       setShowPersonalityDropdown(false);
       Alert.alert('Success', 'Profile updated successfully!');
 
-      // Sync state back with updated profile values from server
+      // Sync local state back with updated profile values from server
       await fetchProfile();
     } catch (error: any) {
       Alert.alert('Update Failed', error?.message || 'Could not update profile.');
@@ -623,41 +686,8 @@ export default function ProfileScreen() {
 
         {/* Section: Location Details */}
         <Text style={styles.sectionTitle}>Location Information</Text>
-
-        <View style={styles.rowFields}>
-          <View style={[styles.fieldGroup, { flex: 1 }]}>
-            <Text style={styles.label}>District</Text>
-            <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
-              <MapPin size={16} color="#64748b" style={{ marginRight: 6 }} />
-              <TextInput
-                style={styles.input}
-                value={district}
-                onChangeText={setDistrict}
-                placeholder="District"
-                placeholderTextColor="#475569"
-                editable={isEditing}
-              />
-            </View>
-          </View>
-
-          <View style={[styles.fieldGroup, { flex: 1 }]}>
-            <Text style={styles.label}>Upazila</Text>
-            <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
-              <MapPin size={16} color="#64748b" style={{ marginRight: 6 }} />
-              <TextInput
-                style={styles.input}
-                value={upazila}
-                onChangeText={setUpazila}
-                placeholder="Upazila"
-                placeholderTextColor="#475569"
-                editable={isEditing}
-              />
-            </View>
-          </View>
-        </View>
-
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Detailed Address</Text>
+          <Text style={styles.label}>Location</Text>
           <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
             <TextInput
               style={styles.input}
@@ -667,20 +697,18 @@ export default function ProfileScreen() {
               placeholderTextColor="#475569"
               editable={isEditing}
             />
-          </View>
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Timezone</Text>
-          <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
-            <TextInput
-              style={styles.input}
-              value={timezone}
-              onChangeText={setTimezone}
-              placeholder="Asia/Dhaka"
-              placeholderTextColor="#475569"
-              editable={isEditing}
-            />
+            <TouchableOpacity
+              onPress={handleGetGPSLocation}
+              disabled={!isEditing || fetchingLocation}
+              activeOpacity={0.7}
+              style={{ paddingLeft: 8, opacity: !isEditing ? 0.4 : 1 }}
+            >
+              {fetchingLocation ? (
+                <ActivityIndicator size="small" color="#3b82f6" />
+              ) : (
+                <MapPin size={18} color={!isEditing ? '#94a3b8' : '#3b82f6'} />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 

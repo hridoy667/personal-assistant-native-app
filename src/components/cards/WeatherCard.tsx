@@ -1,4 +1,3 @@
-// src/components/cards/WeatherCard.tsx
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,6 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { fetchDashboardWeather } from '../../services/weatherApi';
+import { authApi } from '@/services/authapi';
 import { WeatherResponse } from '../../types/weather';
 import { getUserFromToken } from '../../utils/auth';
 
@@ -24,14 +24,22 @@ export const WeatherCard: React.FC = () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // Decode user claims directly from JWT token stored locally
+      // 1. Decode local token for avatar fallback
       const tokenData = await getUserFromToken();
       if (tokenData?.avatarUrl) {
         setTokenAvatar(tokenData.avatarUrl);
       }
 
+      // 2. Fetch weather payload from backend
       const data = await fetchDashboardWeather();
       setWeather(data);
+
+      // 3. Sync resolved location ("Bera, bd") directly to User Profile in background
+      if (data?.location) {
+        await authApi.updateProfile({
+          location: data.location,
+        });
+      }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to load weather update.');
     } finally {
@@ -81,7 +89,6 @@ export const WeatherCard: React.FC = () => {
   const { condition, thermalComfort, location, userName, alertsAndAdvisories } =
     weather;
 
-  // Use avatar from JWT token first, then fallback to initial fallback placeholder
   const finalAvatarUri =
     tokenAvatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(
