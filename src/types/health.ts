@@ -75,6 +75,14 @@ export interface MoodLogResponse {
   createdAt: string;
 }
 
+// --- NEWLY ADDED DAILY MOOD LOGS TYPES ---
+
+export interface GetDailyMoodLogsQueryDto {
+  timezone?: string;
+}
+
+export type DailyMoodLogsResponse = MoodLogResponse[];
+
 export type ActivityType =
   | 'WALKING'
   | 'RUNNING'
@@ -101,4 +109,45 @@ export interface CreateActivityLogDto {
 export interface ActivityLogResponse {
   success: boolean;
   message: string;
+}
+
+// --- SLEEP & STATS TYPES ---
+
+export interface SleepSession {
+  id: string;
+  userId: string;
+  sleptAt: string;
+  wokeUpAt: string | null;
+  isFallback: boolean;
+  qualityRating?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StartSleepDto {
+  sleptAt?: string;
+}
+
+export interface WakeUpDto {
+  wokeUpAt?: string;
+  qualityRating?: number;
+}
+
+export interface UpsertSleepLogDto {
+  targetDate: string;
+  sleptAt: string;
+  wokeUpAt: string;
+  qualityRating?: number;
+}
+
+export type StatsTimeframe = 'DAY' | 'WEEK' | 'MONTH' | 'YEAR';
+
+export interface SleepStatsQueryDto {
+  timeframe?: StatsTimeframe;
+  date?: string;
+}
+
+export interface SleepStatPoint {
+  label: string;
+  avgHours: number;
 }

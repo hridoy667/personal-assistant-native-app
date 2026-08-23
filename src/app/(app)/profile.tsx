@@ -146,10 +146,34 @@ export default function ProfileScreen() {
     return `${year}-${month}-${day}`;
   };
 
-  const formatTimeString = (date: Date) => {
+  // Convert Date object to 24-hour format string (HH:mm) for database storage
+  const formatTime24Hour = (date: Date) => {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
+  };
+
+  // Format 24-hour time string ("14:30") or Date to 12-hour AM/PM string ("2:30 PM") for UI display
+  const formatTimeAMPM = (timeInput: string | Date) => {
+    let dateObj: Date;
+    if (timeInput instanceof Date) {
+      dateObj = timeInput;
+    } else if (typeof timeInput === 'string' && timeInput.includes(':')) {
+      const parts = timeInput.split(':');
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      dateObj = new Date(2024, 0, 1, isNaN(h) ? 0 : h, isNaN(m) ? 0 : m);
+    } else {
+      return '';
+    }
+
+    let hours = dateObj.getHours();
+    const minutes = dateObj.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // '0' hours becomes '12'
+    const strMinutes = minutes < 10 ? `0${minutes}` : minutes;
+    return `${hours}:${strMinutes} ${ampm}`;
   };
 
   const parseTimeStringToDate = (timeStr?: string) => {
@@ -244,7 +268,7 @@ export default function ProfileScreen() {
     if (Platform.OS === 'android') setShowWakePicker(false);
     if (selectedDate) {
       setWakeTimeDate(selectedDate);
-      setDefaultWakeTime(formatTimeString(selectedDate));
+      setDefaultWakeTime(formatTime24Hour(selectedDate));
     }
   };
 
@@ -252,7 +276,7 @@ export default function ProfileScreen() {
     if (Platform.OS === 'android') setShowSleepPicker(false);
     if (selectedDate) {
       setSleepTimeDate(selectedDate);
-      setDefaultSleepTime(formatTimeString(selectedDate));
+      setDefaultSleepTime(formatTime24Hour(selectedDate));
     }
   };
 
@@ -298,8 +322,8 @@ export default function ProfileScreen() {
         name,
         phone: phone.trim() || undefined,
         bio: bio.trim() || undefined,
-        defaultWakeTime: defaultWakeTime || formatTimeString(wakeTimeDate),
-        defaultSleepTime: defaultSleepTime || formatTimeString(sleepTimeDate),
+        defaultWakeTime: defaultWakeTime || formatTime24Hour(wakeTimeDate),
+        defaultSleepTime: defaultSleepTime || formatTime24Hour(sleepTimeDate),
         personalityType: personalityType || null,
         dateOfBirth: formattedDob,
         district: district.trim() || undefined,
@@ -329,9 +353,9 @@ export default function ProfileScreen() {
       setIsEditing(false);
       setShowPersonalityDropdown(false);
       Alert.alert('Success', 'Profile updated successfully!');
-      
-      // Sync State back with Updated User
-      fetchProfile();
+
+      // Sync state back with updated profile values from server
+      await fetchProfile();
     } catch (error: any) {
       Alert.alert('Update Failed', error?.message || 'Could not update profile.');
     } finally {
@@ -500,7 +524,7 @@ export default function ProfileScreen() {
             >
               <Clock size={16} color="#64748b" style={{ marginRight: 6 }} />
               <Text style={styles.input}>
-                {defaultWakeTime || formatTimeString(wakeTimeDate)}
+                {formatTimeAMPM(defaultWakeTime || wakeTimeDate)}
               </Text>
             </TouchableOpacity>
 
@@ -509,7 +533,7 @@ export default function ProfileScreen() {
                 <DateTimePicker
                   value={wakeTimeDate}
                   mode="time"
-                  is24Hour={true}
+                  is24Hour={false}
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   onChange={handleWakeTimeChange}
                 />
@@ -533,7 +557,7 @@ export default function ProfileScreen() {
             >
               <Clock size={16} color="#64748b" style={{ marginRight: 6 }} />
               <Text style={styles.input}>
-                {defaultSleepTime || formatTimeString(sleepTimeDate)}
+                {formatTimeAMPM(defaultSleepTime || sleepTimeDate)}
               </Text>
             </TouchableOpacity>
 
@@ -542,7 +566,7 @@ export default function ProfileScreen() {
                 <DateTimePicker
                   value={sleepTimeDate}
                   mode="time"
-                  is24Hour={true}
+                  is24Hour={false}
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   onChange={handleSleepTimeChange}
                 />

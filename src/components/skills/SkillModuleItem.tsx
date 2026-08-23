@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
-import { CheckCircle2, Circle, ExternalLink, ChevronDown, ChevronUp, BookOpen, Dumbbell, Lock } from 'lucide-react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import YoutubePlayer from 'react-native-youtube-iframe';
+import { CheckCircle2, Circle, ChevronDown, ChevronUp, BookOpen, Dumbbell, Lock, Play } from 'lucide-react-native';
 import { SkillModule } from '@/types/skills';
 
 interface Props {
@@ -11,6 +12,17 @@ interface Props {
 
 export function SkillModuleItem({ module, isLocked = false, onToggle }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [playing, setPlaying] = useState(false);
+
+  // Helper to extract YouTube video ID from various URL formats
+  const extractVideoId = (url?: string | null) => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return match && match[2].length === 11 ? match[2] : null;
+};
+
+  const videoId = extractVideoId(module.videoUrl);
 
   const handleToggleExpand = () => {
     if (!isLocked) {
@@ -18,19 +30,27 @@ export function SkillModuleItem({ module, isLocked = false, onToggle }: Props) {
     }
   };
 
+  const onStateChange = useCallback((state: string) => {
+    if (state === 'ended') {
+      setPlaying(false);
+    }
+  }, []);
+
   return (
-    <View style={[
-      styles.card, 
-      module.isCompleted && styles.completedCard,
-      isLocked && styles.lockedCard
-    ]}>
-      <TouchableOpacity 
-        style={styles.headerRow} 
-        activeOpacity={isLocked ? 1 : 0.7} 
+    <View
+      style={[
+        styles.card,
+        module.isCompleted && styles.completedCard,
+        isLocked && styles.lockedCard,
+      ]}
+    >
+      <TouchableOpacity
+        style={styles.headerRow}
+        activeOpacity={isLocked ? 1 : 0.7}
         onPress={handleToggleExpand}
       >
-        <TouchableOpacity 
-          onPress={() => !isLocked && onToggle(module.id)} 
+        <TouchableOpacity
+          onPress={() => !isLocked && onToggle(module.id)}
           hitSlop={10}
           disabled={isLocked}
         >
@@ -47,22 +67,49 @@ export function SkillModuleItem({ module, isLocked = false, onToggle }: Props) {
           <Text style={[styles.stepBadge, isLocked && styles.lockedStepBadge]}>
             MODULE {module.order} {isLocked ? '• LOCKED' : ''}
           </Text>
-          <Text style={[
-            styles.title, 
-            module.isCompleted && styles.completedText,
-            isLocked && styles.lockedText
-          ]}>
+          <Text
+            style={[
+              styles.title,
+              module.isCompleted && styles.completedText,
+              isLocked && styles.lockedText,
+            ]}
+          >
             {module.title}
           </Text>
         </View>
 
-        {!isLocked && (
-          expanded ? <ChevronUp size={18} color="#94A3B8" /> : <ChevronDown size={18} color="#94A3B8" />
-        )}
+        {!isLocked &&
+          (expanded ? (
+            <ChevronUp size={18} color="#94A3B8" />
+          ) : (
+            <ChevronDown size={18} color="#94A3B8" />
+          ))}
       </TouchableOpacity>
 
       {!isLocked && expanded && (
         <View style={styles.expandedContent}>
+          {/* Embedded YouTube Player */}
+          {videoId && (
+            <View style={styles.videoSection}>
+              <View style={styles.sectionHeader}>
+                <Play size={14} color="#34D399" />
+                <Text style={styles.sectionTitle}>Video Resource</Text>
+              </View>
+              <View style={styles.videoContainer}>
+                <YoutubePlayer
+                  height={200}
+                  play={playing}
+                  videoId={videoId}
+                  onChangeState={onStateChange}
+                  initialPlayerParams={{
+                    preventFullScreen: false, // Allows full screen button inside player controls
+                    showClosedCaptions: true,
+                  }}
+                />
+              </View>
+            </View>
+          )}
+
           {/* Theory Section */}
           <View style={styles.sectionBlock}>
             <View style={styles.sectionHeader}>
@@ -71,18 +118,6 @@ export function SkillModuleItem({ module, isLocked = false, onToggle }: Props) {
             </View>
             <Text style={styles.theoryText}>{module.theoryText}</Text>
           </View>
-
-          {/* Video Link */}
-          {module.videoUrl && (
-            <TouchableOpacity
-              style={styles.videoBtn}
-              activeOpacity={0.8}
-              onPress={() => Linking.openURL(module.videoUrl!)}
-            >
-              <ExternalLink size={14} color="#34D399" />
-              <Text style={styles.videoBtnText}>Open Video Resource</Text>
-            </TouchableOpacity>
-          )}
 
           {/* Practice Task */}
           <View style={styles.sectionBlock}>
@@ -111,10 +146,10 @@ const styles = StyleSheet.create({
   lockedText: { color: '#64748B' },
   expandedContent: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1E293B', gap: 10 },
   sectionBlock: { backgroundColor: '#151C2C', padding: 10, borderRadius: 8 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   sectionTitle: { fontSize: 11, fontWeight: '700', color: '#94A3B8' },
   theoryText: { fontSize: 12, color: '#CBD5E1', lineHeight: 18 },
   practiceText: { fontSize: 12, color: '#FDE68A', lineHeight: 17 },
-  videoBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#064E3B30', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#059669' },
-  videoBtnText: { fontSize: 12, fontWeight: '600', color: '#34D399' },
+  videoSection: { backgroundColor: '#151C2C', padding: 10, borderRadius: 8 },
+  videoContainer: { borderRadius: 8, overflow: 'hidden', marginTop: 4 },
 });

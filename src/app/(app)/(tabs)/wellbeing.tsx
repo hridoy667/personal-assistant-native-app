@@ -19,16 +19,26 @@ import {
   ArrowRight,
   Activity,
   Smile,
-  Zap,
+  Moon,
+  BarChart2,
+  Play,
+  Square,
 } from 'lucide-react-native';
 
 import { WellbeingApiService } from '@/services/wellbeing.service';
-import { WellbeingData } from '@/types/health';
+import {
+  WellbeingData,
+  SleepSession,
+  SleepStatPoint,
+  StatsTimeframe,
+  MoodLogResponse,
+} from '@/types/health';
 import { getCachedLocation } from '@/lib/locationCache';
 import { ActivityLoggerModal } from '@/components/modals/ActivityLoggerModal';
 import { MoodLoggerModal } from '@/components/modals/MoodLoggerModal';
 import { ScreenTimeCard } from '@/components/cards/ScreenTimeCard';
 import { HabitSectionCard } from '@/components/cards/HabitSectionCard';
+import { TodayMoodCard } from '@/components/cards/TodayMoodCard'
 
 type WellbeingMainTab = 'activity' | 'mood';
 
@@ -45,6 +55,16 @@ export default function WellbeingScreen() {
   // Modal control states
   const [showActivityModal, setShowActivityModal] = useState<boolean>(false);
   const [showMoodModal, setShowMoodModal] = useState<boolean>(false);
+
+  // Sleep & Mood Data States
+  const [todayMoodLogs, setTodayMoodLogs] = useState<MoodLogResponse[]>([]);
+  const [moodLogsLoading, setMoodLogsLoading] = useState<boolean>(false);
+
+  const [activeSession, setActiveSession] = useState<SleepSession | null>(null);
+  const [sleepStats, setSleepStats] = useState<SleepStatPoint[]>([]);
+  const [timeframe, setTimeframe] = useState<StatsTimeframe>('WEEK');
+  const [sleepLoading, setSleepLoading] = useState<boolean>(false);
+  const [sleepActionLoading, setSleepActionLoading] = useState<boolean>(false);
 
   const fetchWellbeing = useCallback(async () => {
     try {
@@ -80,13 +100,71 @@ export default function WellbeingScreen() {
     }
   }, []);
 
+  // Fetch mood logs for today
+  const fetchMoodData = useCallback(async () => {
+  try {
+    setMoodLogsLoading(true);
+    const logs = await WellbeingApiService.getDailyMoodLogs();
+    setTodayMoodLogs(logs || []);
+  } catch (err) {
+    console.error("Failed to fetch today's mood logs:", err);
+  } finally {
+    setMoodLogsLoading(false);
+  }
+}, []);
+
+  // Fetch sleep sessions and chart stats
+  const fetchSleepData = useCallback(async () => {
+    try {
+      setSleepLoading(true);
+      const [session, stats] = await Promise.all([
+        WellbeingApiService.getActiveSleepSession(),
+        WellbeingApiService.getSleepStats({ timeframe }),
+      ]);
+      setActiveSession(session);
+      setSleepStats(stats || []);
+    } catch (err) {
+      console.error('Failed to fetch sleep data:', err);
+    } finally {
+      setSleepLoading(false);
+    }
+  }, [timeframe]);
+
   useEffect(() => {
     fetchWellbeing();
   }, [fetchWellbeing]);
 
+  useEffect(() => {
+    if (mainTab === 'mood') {
+      fetchMoodData();
+      fetchSleepData();
+    }
+  }, [mainTab, fetchMoodData, fetchSleepData]);
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchWellbeing();
+    if (mainTab === 'mood') {
+      fetchMoodData();
+      fetchSleepData();
+    }
+  };
+
+  // Live Sleep Session Actions
+  const handleToggleSleep = async () => {
+    try {
+      setSleepActionLoading(true);
+      if (activeSession) {
+        await WellbeingApiService.wakeUpSession(activeSession.id);
+      } else {
+        await WellbeingApiService.startSleepSession();
+      }
+      await fetchSleepData();
+    } catch (err: any) {
+      console.error('Error toggling sleep session:', err);
+    } finally {
+      setSleepActionLoading(false);
+    }
   };
 
   if (loading && !refreshing) {
@@ -144,6 +222,9 @@ export default function WellbeingScreen() {
 
   const hasInsightsOrAlerts =
     !!workout || healthInsights.length > 0 || weatherAlerts.length > 0;
+
+  // Max value for normalized bar chart height calculations
+  const maxAvgHours = Math.max(...sleepStats.map((s) => s.avgHours), 8);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -243,7 +324,7 @@ export default function WellbeingScreen() {
           <Text style={styles.insightBody}>
             {mainTab === 'activity'
               ? `Your recommended intake is ~${metabolic?.tdee ?? 0} kcal. Ensure adequate hydration (~${targetLiters}L) to maintain continuous focus.`
-              : 'Consistent emotional logging helps identify fatigue triggers early. Log your state to receive personalized mindfulness suggestions.'}
+              : 'Consistent emotional and sleep tracking helps identify fatigue triggers early. Log your state to receive personalized mindfulness suggestions.'}
           </Text>
 
           <TouchableOpacity style={styles.insightAction} activeOpacity={0.7}>
@@ -361,23 +442,122 @@ export default function WellbeingScreen() {
         ) : (
           /* TAB 2: MOOD & MIND CONTENT */
           <View style={styles.moodContainer}>
+            {/* Today's Mood Logs Card */}
+            <TodayMoodCard
+              logs={todayMoodLogs}
+              isLoading={moodLogsLoading}
+              onAddMoodClick={() => setShowMoodModal(true)}
+            />
+
+            {/* Live Sleep Tracker Card */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Zap size={18} color="#10B981" style={{ marginRight: 8 }} />
-                <Text style={styles.cardTitle}>Emotional Balance & Focus</Text>
+                <Moon size={18} color="#818CF8" style={{ marginRight: 8 }} />
+                <Text style={styles.cardTitle}>Live Sleep Session</Text>
               </View>
 
-              <Text style={styles.moodSummaryText}>
-                No mood logs recorded for today yet. Use the top button to quickly record your focus, stress, or overall emotional energy level.
-              </Text>
+              <View style={styles.sleepStatusBox}>
+                <View style={styles.sleepStatusInfo}>
+                  <Text style={styles.sleepStatusLabel}>Status</Text>
+                  <Text style={styles.sleepStatusText}>
+                    {activeSession ? '😴 Currently Sleeping' : '☀️ Awake'}
+                  </Text>
+                  {activeSession && (
+                    <Text style={styles.sleepSubText}>
+                      Since {new Date(activeSession.sleptAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  )}
+                </View>
 
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={styles.logMoodOutlineBtn}
-                onPress={() => setShowMoodModal(true)}
-              >
-                <Text style={styles.logMoodOutlineBtnText}>+ Log Current Mood</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={sleepActionLoading}
+                  style={[
+                    styles.sleepToggleBtn,
+                    activeSession ? styles.wakeBtn : styles.sleepBtn,
+                  ]}
+                  onPress={handleToggleSleep}
+                >
+                  {sleepActionLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : activeSession ? (
+                    <>
+                      <Square size={14} color="#FFFFFF" fill="#FFFFFF" />
+                      <Text style={styles.sleepToggleText}>Wake Up</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={14} color="#FFFFFF" fill="#FFFFFF" />
+                      <Text style={styles.sleepToggleText}>Start Sleep</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Sleep Analytics & Stats Card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRowBetween}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <BarChart2 size={18} color="#38BDF8" style={{ marginRight: 8 }} />
+                  <Text style={styles.cardTitle}>Sleep Analytics</Text>
+                </View>
+                {sleepLoading && <ActivityIndicator size="small" color="#38BDF8" />}
+              </View>
+
+              {/* Timeframe Selector */}
+              <View style={styles.timeframeRow}>
+                {(['DAY', 'WEEK', 'MONTH', 'YEAR'] as StatsTimeframe[]).map((tf) => (
+                  <TouchableOpacity
+                    key={tf}
+                    style={[
+                      styles.timeframeChip,
+                      timeframe === tf && styles.activeTimeframeChip,
+                    ]}
+                    onPress={() => setTimeframe(tf)}
+                  >
+                    <Text
+                      style={[
+                        styles.timeframeText,
+                        timeframe === tf && styles.activeTimeframeText,
+                      ]}
+                    >
+                      {tf}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Sleep Stats Visualization */}
+              {sleepStats.length > 0 ? (
+                <View style={styles.chartContainer}>
+                  {sleepStats.map((stat, idx) => {
+                    const heightPercent = Math.min((stat.avgHours / maxAvgHours) * 100, 100);
+                    return (
+                      <View key={`stat-${idx}`} style={styles.barWrapper}>
+                        <Text style={styles.barValText}>
+                          {stat.avgHours > 0 ? `${stat.avgHours.toFixed(1)}h` : ''}
+                        </Text>
+                        <View style={styles.barBackground}>
+                          <View
+                            style={[
+                              styles.barFill,
+                              { height: `${Math.max(heightPercent, 5)}%` },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.barLabelText} numberOfLines={1}>
+                          {stat.label}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text style={styles.emptyStatsText}>
+                  No sleep records found for this period.
+                </Text>
+              )}
             </View>
           </View>
         )}
@@ -392,7 +572,10 @@ export default function WellbeingScreen() {
       <MoodLoggerModal
         visible={showMoodModal}
         onClose={() => setShowMoodModal(false)}
-        onSuccess={fetchWellbeing}
+        onSuccess={() => {
+          fetchWellbeing();
+          fetchMoodData();
+        }}
       />
     </SafeAreaView>
   );
@@ -460,6 +643,7 @@ const styles = StyleSheet.create({
   cardWrapper: { marginBottom: 16 },
   card: { backgroundColor: '#151C2C', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#1E293B' },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  cardHeaderRowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   cardIcon: { fontSize: 18, marginRight: 8 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#F1F5F9' },
 
@@ -474,7 +658,66 @@ const styles = StyleSheet.create({
   levelMedium: { color: '#F59E0B', backgroundColor: '#451A03' },
 
   moodContainer: { marginTop: 4 },
-  moodSummaryText: { fontSize: 13, color: '#94A3B8', lineHeight: 18, marginBottom: 16 },
-  logMoodOutlineBtn: { paddingVertical: 12, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#059669', backgroundColor: '#064E3B20' },
-  logMoodOutlineBtnText: { color: '#34D399', fontWeight: '700', fontSize: 13 },
+
+  // Live Sleep Styles
+  sleepStatusBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  sleepStatusInfo: { flex: 1 },
+  sleepStatusLabel: { fontSize: 11, color: '#64748B', fontWeight: '700', textTransform: 'uppercase' },
+  sleepStatusText: { fontSize: 15, fontWeight: '700', color: '#F8FAFC', marginTop: 2 },
+  sleepSubText: { fontSize: 11, color: '#818CF8', marginTop: 2 },
+  sleepToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  sleepBtn: { backgroundColor: '#4F46E5' },
+  wakeBtn: { backgroundColor: '#DC2626' },
+  sleepToggleText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+
+  // Sleep Stats Chart Styles
+  timeframeRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
+  timeframeChip: {
+    flex: 1,
+    paddingVertical: 6,
+    alignItems: 'center',
+    borderRadius: 6,
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  activeTimeframeChip: { backgroundColor: '#0284C7', borderColor: '#38BDF8' },
+  timeframeText: { fontSize: 11, fontWeight: '700', color: '#64748B' },
+  activeTimeframeText: { color: '#FFFFFF' },
+  chartContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 140,
+    paddingTop: 10,
+  },
+  barWrapper: { flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' },
+  barValText: { fontSize: 10, color: '#38BDF8', fontWeight: '700', marginBottom: 4 },
+  barBackground: {
+    width: 14,
+    height: 90,
+    backgroundColor: '#0F172A',
+    borderRadius: 8,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  barFill: { width: '100%', backgroundColor: '#38BDF8', borderRadius: 8 },
+  barLabelText: { fontSize: 10, color: '#64748B', marginTop: 6 },
+  emptyStatsText: { fontSize: 12, color: '#64748B', textAlign: 'center', marginVertical: 20 },
 });

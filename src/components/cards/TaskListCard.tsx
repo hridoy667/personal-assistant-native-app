@@ -20,7 +20,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { taskService } from '@/services/task.service';
 import { Task, TaskPriority, CreateTaskPayload } from '@/types/task';
 import { TaskDetailModal } from '../modals/TaskDetailModal';
-import { eventBus } from '@/utils/eventBus'; // 👈 Import eventBus
+import { eventBus } from '@/utils/eventBus';
 
 interface TaskListCardProps {
   ListHeaderComponent?: React.ReactElement;
@@ -68,14 +68,18 @@ export function TaskListCard({
     }, [])
   );
 
-  // 👈 Subscribe to global task creation events
+  // Subscribe to global task creation and update events
   useEffect(() => {
-    const unsubscribe = eventBus.on('TASK_CREATED', () => {
+    const unsubCreated = eventBus.on('TASK_CREATED', () => {
+      loadInitialTasks();
+    });
+    const unsubUpdated = eventBus.on('TASK_UPDATED', () => {
       loadInitialTasks();
     });
 
     return () => {
-      unsubscribe();
+      unsubCreated();
+      unsubUpdated();
     };
   }, []);
 
@@ -90,6 +94,7 @@ export function TaskListCard({
 
     try {
       await taskService.toggleTask(id);
+      eventBus.emit('TASK_UPDATED');
     } catch (error) {
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
@@ -104,6 +109,7 @@ export function TaskListCard({
     try {
       await taskService.updateTask(id, payload);
       await loadInitialTasks();
+      eventBus.emit('TASK_UPDATED');
       handleCloseModal();
     } catch (error) {
       console.error('Failed to update task:', error);
@@ -116,6 +122,7 @@ export function TaskListCard({
 
     try {
       await taskService.deleteTask(id);
+      eventBus.emit('TASK_UPDATED');
       loadInitialTasks();
     } catch (error) {
       console.error('Failed to delete task:', error);

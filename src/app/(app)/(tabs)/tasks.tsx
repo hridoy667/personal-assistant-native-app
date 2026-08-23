@@ -27,6 +27,7 @@ import { Skill, GenerateSkillRoadmapDto, UpdateSkillDto } from '@/types/skills';
 
 import { taskService } from '@/services/task.service';
 import { SkillsApiService } from '@/services/skillsService';
+import { eventBus } from '@/utils/eventBus';
 
 const PAGE_LIMIT = 10;
 
@@ -88,6 +89,21 @@ export default function TasksScreen() {
     }
   }, [mainTab, fetchTasks, fetchSkills]);
 
+  // Subscribe to task events across the app
+  useEffect(() => {
+    const unsubCreated = eventBus.on('TASK_CREATED', () => {
+      fetchTasks();
+    });
+    const unsubUpdated = eventBus.on('TASK_UPDATED', () => {
+      fetchTasks();
+    });
+
+    return () => {
+      unsubCreated();
+      unsubUpdated();
+    };
+  }, [fetchTasks]);
+
   const handleTaskSubmit = async (payload: CreateTaskPayload) => {
     try {
       if (editingTask) {
@@ -97,6 +113,7 @@ export default function TasksScreen() {
       }
       setIsTaskModalOpen(false);
       setEditingTask(null);
+      eventBus.emit(editingTask ? 'TASK_UPDATED' : 'TASK_CREATED');
       fetchTasks();
     } catch {
       Alert.alert('Error', 'Failed to save task.');
@@ -182,11 +199,23 @@ export default function TasksScreen() {
                   setTasks(prev =>
                     prev.map(t => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
                   );
-                  await taskService.toggleTask(id);
+                  try {
+                    await taskService.toggleTask(id);
+                    eventBus.emit('TASK_UPDATED');
+                  } catch {
+                    setTasks(prev =>
+                      prev.map(t => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
+                    );
+                  }
                 }}
                 onDelete={async id => {
                   setTasks(prev => prev.filter(t => t.id !== id));
-                  await taskService.deleteTask(id);
+                  try {
+                    await taskService.deleteTask(id);
+                    eventBus.emit('TASK_UPDATED');
+                  } catch {
+                    fetchTasks();
+                  }
                 }}
                 onEdit={t => {
                   setEditingTask(t);
