@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Moon, BarChart2, Play, Square } from 'lucide-react-native';
+import { Moon, BarChart2, Play, Square, Sparkles, RefreshCw } from 'lucide-react-native';
 
 import { ScreenTimeCard } from '@/components/cards/ScreenTimeCard';
 import { HabitSectionCard } from '@/components/cards/HabitSectionCard';
@@ -17,6 +17,9 @@ import {
   SleepStatPoint,
   StatsTimeframe,
 } from '@/types/health';
+import { aiService } from '@/services/aiService';
+import { SuggestionContextType } from '@/types/ai';
+import { renderFormattedText } from '@/utils/textFormatter';
 
 interface ActivityTabContentProps {
   wellbeingData: WellbeingData | null;
@@ -41,6 +44,10 @@ export const ActivityTabContent: React.FC<ActivityTabContentProps> = ({
   onToggleSleep,
   onHabitChange,
 }) => {
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+  const [aiError, setAiError] = useState<boolean>(false);
+
   const userProfile = wellbeingData?.userProfile;
   const metabolic = wellbeingData?.metabolicMetrics;
   const hydration = wellbeingData?.hydration;
@@ -55,6 +62,27 @@ export const ActivityTabContent: React.FC<ActivityTabContentProps> = ({
   const targetLiters = hydration?.targetMl ? (hydration.targetMl / 1000).toFixed(1) : '0';
   const hasInsightsOrAlerts = !!workout || healthInsights.length > 0 || weatherAlerts.length > 0;
   const maxAvgHours = Math.max(...sleepStats.map((s) => s.avgHours), 8);
+
+  // Fetch AI Physical Activity Suggestion
+  const fetchAiSuggestion = useCallback(async () => {
+    try {
+      setAiLoading(true);
+      setAiError(false);
+      const res = await aiService.generateSuggestion({
+        contextType: SuggestionContextType.PHYSICAL_ACTIVITY,
+      });
+      setAiSuggestion(res.suggestion);
+    } catch (error) {
+      console.error('[ActivityTabContent] Failed to fetch AI suggestion:', error);
+      setAiError(true);
+    } finally {
+      setAiLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAiSuggestion();
+  }, [fetchAiSuggestion]);
 
   return (
     <>
@@ -95,12 +123,13 @@ export const ActivityTabContent: React.FC<ActivityTabContentProps> = ({
         ) : null}
       </LinearGradient>
 
-      {/* 2. Screen Time Tracker */}
+
+      {/* 3. Screen Time Tracker */}
       <View style={styles.cardWrapper}>
         <ScreenTimeCard />
       </View>
 
-      {/* 3. Live Sleep Tracker Card */}
+      {/* 4. Live Sleep Tracker Card */}
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <Moon size={18} color="#818CF8" style={{ marginRight: 8 }} />
@@ -146,7 +175,7 @@ export const ActivityTabContent: React.FC<ActivityTabContentProps> = ({
         </View>
       </View>
 
-      {/* 4. Sleep Analytics & Stats Card */}
+      {/* 5. Sleep Analytics & Stats Card */}
       <View style={styles.card}>
         <View style={styles.cardHeaderRowBetween}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -211,10 +240,10 @@ export const ActivityTabContent: React.FC<ActivityTabContentProps> = ({
         )}
       </View>
 
-      {/* 5. Daily Habits Section */}
+      {/* 6. Daily Habits Section */}
       <HabitSectionCard onHabitChange={onHabitChange} />
 
-      {/* 6. Environmental & Activity Insights */}
+      {/* 7. Environmental & Activity Insights */}
       {hasInsightsOrAlerts && (
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
@@ -319,4 +348,12 @@ const styles = StyleSheet.create({
   levelBadge: { fontSize: 10, color: '#94A3B8', backgroundColor: '#1E293B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, fontWeight: '700' },
   levelHigh: { color: '#EF4444', backgroundColor: '#451A03' },
   levelMedium: { color: '#F59E0B', backgroundColor: '#451A03' },
+
+  /* AI Advisory Styles */
+  aiLoadingContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
+  aiLoadingText: { fontSize: 13, color: '#94A3B8' },
+  aiErrorText: { fontSize: 12, color: '#EF4444', paddingVertical: 8 },
+  aiContentContainer: { backgroundColor: '#0F172A', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#1E293B' },
+  aiSuggestionText: { fontSize: 13, color: '#CBD5E1', lineHeight: 20 },
+  aiBoldText: { color: '#F8FAFC' },
 });

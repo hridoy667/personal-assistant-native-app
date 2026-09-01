@@ -46,9 +46,6 @@ export default function TasksScreen() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
 
-  // Filter Tabs (For Tasks)
-  const [activeSection, setActiveSection] = useState<'all' | 'pending' | 'completed'>('all');
-
   const isSkillsTab = mainTab === 'skills';
 
   const fetchTasks = useCallback(async () => {
@@ -57,7 +54,6 @@ export default function TasksScreen() {
       const response = await taskService.getTasks({
         limit: PAGE_LIMIT,
         search: searchQuery || undefined,
-        status: activeSection,
       });
       setTasks(response.data || []);
     } catch {
@@ -66,7 +62,7 @@ export default function TasksScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [searchQuery, activeSection]);
+  }, [searchQuery]);
 
   const fetchSkills = useCallback(async () => {
     try {
@@ -311,42 +307,18 @@ export default function TasksScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Filters (Tasks Tab Only) */}
+            {/* Search Input (Tasks Tab Only) */}
             {mainTab === 'tasks' && (
-              <>
-                <View style={styles.searchContainer}>
-                  <Search color="#64748B" size={18} />
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search tasks..."
-                    placeholderTextColor="#64748B"
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                  />
-                </View>
-
-                <View style={styles.filterTabs}>
-                  {(['all', 'pending', 'completed'] as const).map(sec => (
-                    <TouchableOpacity
-                      key={sec}
-                      style={[
-                        styles.filterTab,
-                        activeSection === sec && styles.activeFilterTab,
-                      ]}
-                      onPress={() => setActiveSection(sec)}
-                    >
-                      <Text
-                        style={[
-                          styles.filterTabText,
-                          activeSection === sec && styles.activeFilterTabText,
-                        ]}
-                      >
-                        {sec.charAt(0).toUpperCase() + sec.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
+              <View style={styles.searchContainer}>
+                <Search color="#64748B" size={18} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search tasks..."
+                  placeholderTextColor="#64748B"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
             )}
           </>
         }
@@ -413,13 +385,8 @@ const styles = StyleSheet.create({
   insightAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   insightActionText: { fontSize: 12, fontWeight: '700', color: '#818CF8' },
   insightActionTextSkills: { color: '#34D399' },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#151C2C', borderRadius: 12, paddingHorizontal: 14, height: 48, borderWidth: 1, borderColor: '#1E293B', marginBottom: 14 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#151C2C', borderRadius: 12, paddingHorizontal: 14, height: 48, borderWidth: 1, borderColor: '#1E293B', marginBottom: 16 },
   searchInput: { flex: 1, color: '#F8FAFC', fontSize: 14, marginLeft: 10 },
-  filterTabs: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  filterTab: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: '#151C2C', borderRadius: 10, borderWidth: 1, borderColor: '#1E293B' },
-  activeFilterTab: { backgroundColor: '#312E81', borderColor: '#6366F1' },
-  filterTabText: { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
-  activeFilterTabText: { color: '#F8FAFC', fontWeight: '700' },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50 },
   emptyTitle: { color: '#F8FAFC', fontSize: 16, fontWeight: '700', marginTop: 12 },
   emptySub: { color: '#64748B', fontSize: 13, marginTop: 4 },

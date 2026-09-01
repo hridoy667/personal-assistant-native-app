@@ -15,6 +15,7 @@ export const taskService = {
    */
   async getTasks(params?: PaginationQuery): Promise<PaginatedTaskResponse> {
     const queryParams: string[] = [];
+
     if (params?.limit !== undefined) {
       queryParams.push(`limit=${params.limit}`);
     }
@@ -24,11 +25,10 @@ export const taskService = {
     if (params?.search) {
       queryParams.push(`search=${encodeURIComponent(params.search)}`);
     }
-    if (params?.status) { // 👈 ADD THIS IF STATEMENT
-      queryParams.push(`status=${encodeURIComponent(params.status)}`);
-    }
+
     const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
     const endpoint = `/tasks${queryString}`;
+
     return apiClient<PaginatedTaskResponse>(endpoint, { method: 'GET' });
   },
 
@@ -54,7 +54,7 @@ export const taskService = {
   /**
    * Toggle completed status of a task
    */
-  async toggleTask(id: string): Promise<GetSingleTaskResponse> { 
+  async toggleTask(id: string): Promise<GetSingleTaskResponse> {
     return apiClient<GetSingleTaskResponse>(`/tasks/${id}/toggle`, {
       method: 'PATCH',
     });

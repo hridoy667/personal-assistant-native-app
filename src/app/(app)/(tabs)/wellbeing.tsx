@@ -16,12 +16,16 @@ import {
   Plus,
   Sparkles,
   Lightbulb,
-  ArrowRight,
   Activity,
   Smile,
+  RefreshCw,
 } from 'lucide-react-native';
 
 import { WellbeingApiService } from '@/services/wellbeing.service';
+import { aiService } from '@/services/aiService';
+import { SuggestionContextType } from '@/types/ai';
+import { renderFormattedText } from '@/utils/textFormatter';
+
 import {
   WellbeingData,
   SleepSession,
@@ -29,7 +33,6 @@ import {
   StatsTimeframe,
   MoodLogResponse,
 } from '@/types/health';
-import { getCachedLocation } from '@/lib/locationCache';
 import { ActivityLoggerModal } from '@/components/modals/ActivityLoggerModal';
 import { MoodLoggerModal } from '@/components/modals/MoodLoggerModal';
 import { ActivityTabContent } from '@/components/tabs/ActivityTabContent';
@@ -61,21 +64,16 @@ export default function WellbeingScreen() {
   const [sleepLoading, setSleepLoading] = useState<boolean>(false);
   const [sleepActionLoading, setSleepActionLoading] = useState<boolean>(false);
 
+  // AI Suggestion Banner State
+  const [aiBannerSuggestion, setAiBannerSuggestion] = useState<string | null>(null);
+  const [aiBannerLoading, setAiBannerLoading] = useState<boolean>(false);
+  const [aiBannerError, setAiBannerError] = useState<boolean>(false);
+
   const fetchWellbeing = useCallback(async () => {
     try {
       setErrorMessage('');
-      let lat: number | undefined;
-      let lon: number | undefined;
 
-      try {
-        const coords = await getCachedLocation();
-        lat = coords.latitude;
-        lon = coords.longitude;
-      } catch {
-        // Fallback silently
-      }
-
-      const response = await WellbeingApiService.getWellbeingContext(lat, lon);
+      const response = await WellbeingApiService.getWellbeingContext();
 
       if (!response.success && response.isUpdateRequired) {
         setUpdateRequired(true);
@@ -123,20 +121,65 @@ export default function WellbeingScreen() {
     }
   }, [timeframe]);
 
+  // Initial / Tab-change fetch (reads Redis cache if warm)
+  const fetchTabAiSuggestion = useCallback(async () => {
+    try {
+      setAiBannerLoading(true);
+      setAiBannerError(false);
+      
+      const contextType =
+        mainTab === 'activity'
+          ? SuggestionContextType.PHYSICAL_ACTIVITY
+          : SuggestionContextType.MENTAL_HEALTH;
+
+      const res = await aiService.generateSuggestion({ contextType });
+      setAiBannerSuggestion(res.suggestion);
+    } catch (error) {
+      console.error('[WellbeingScreen] Failed to fetch AI suggestion:', error);
+      setAiBannerError(true);
+    } finally {
+      setAiBannerLoading(false);
+    }
+  }, [mainTab]);
+
+  // Card Refresh Icon Handler ONLY: Invalidation of Redis cache & fresh generation
+  const handleRefreshAiSuggestion = useCallback(async () => {
+    try {
+      setAiBannerLoading(true);
+      setAiBannerError(false);
+      
+      const contextType =
+        mainTab === 'activity'
+          ? SuggestionContextType.PHYSICAL_ACTIVITY
+          : SuggestionContextType.MENTAL_HEALTH;
+
+      const res = await aiService.refreshSuggestion({ contextType });
+      setAiBannerSuggestion(res.suggestion);
+    } catch (error) {
+      console.error('[WellbeingScreen] Failed to force-refresh AI suggestion:', error);
+      setAiBannerError(true);
+    } finally {
+      setAiBannerLoading(false);
+    }
+  }, [mainTab]);
+
   useEffect(() => {
     fetchWellbeing();
   }, [fetchWellbeing]);
 
   useEffect(() => {
+    fetchTabAiSuggestion();
     if (mainTab === 'mood') {
       fetchMoodData();
       fetchSleepData();
     }
-  }, [mainTab, fetchMoodData, fetchSleepData]);
+  }, [mainTab, fetchMoodData, fetchSleepData, fetchTabAiSuggestion]);
 
+  // Pull-to-refresh ONLY syncs general health data & fetches cached AI suggestions
   const onRefresh = () => {
     setRefreshing(true);
     fetchWellbeing();
+    fetchTabAiSuggestion();
     if (mainTab === 'mood') {
       fetchMoodData();
       fetchSleepData();
@@ -198,10 +241,6 @@ export default function WellbeingScreen() {
       </SafeAreaView>
     );
   }
-
-  const metabolic = wellbeingData?.metabolicMetrics;
-  const hydration = wellbeingData?.hydration;
-  const targetLiters = hydration?.targetMl ? (hydration.targetMl / 1000).toFixed(1) : '0';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -280,7 +319,7 @@ export default function WellbeingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* AI Insight Banner */}
+        {/* Dynamic AI Insight Banner */}
         <View style={styles.insightCard}>
           <View style={styles.insightHeader}>
             <View style={styles.insightTag}>
@@ -291,29 +330,42 @@ export default function WellbeingScreen() {
                   { color: mainTab === 'activity' ? '#818CF8' : '#34D399' },
                 ]}
               >
-                {mainTab === 'activity' ? 'RECOVERY & ENERGY' : 'MENTAL WELLNESS'}
+                {mainTab === 'activity' ? 'PHYSICAL ACTIVITY ADVISORY' : 'MENTAL WELLNESS ADVISORY'}
               </Text>
             </View>
-            <Sparkles size={16} color="#64748B" />
+            <TouchableOpacity
+              onPress={handleRefreshAiSuggestion}
+              disabled={aiBannerLoading}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              {aiBannerLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={mainTab === 'activity' ? '#818CF8' : '#34D399'}
+                />
+              ) : (
+                <RefreshCw size={14} color="#64748B" />
+              )}
+            </TouchableOpacity>
           </View>
 
-          <Text style={styles.insightBody}>
-            {mainTab === 'activity'
-              ? `Your recommended intake is ~${metabolic?.tdee ?? 0} kcal. Ensure adequate hydration (~${targetLiters}L) to maintain continuous focus.`
-              : 'Consistent emotional and sleep tracking helps identify fatigue triggers early. Log your state to receive personalized mindfulness suggestions.'}
-          </Text>
-
-          <TouchableOpacity style={styles.insightAction} activeOpacity={0.7}>
-            <Text
-              style={[
-                styles.insightActionText,
-                { color: mainTab === 'activity' ? '#818CF8' : '#34D399' },
-              ]}
-            >
-              {mainTab === 'activity' ? 'View Activity Plan' : 'Check Mood Trends'}
+          {aiBannerLoading && !aiBannerSuggestion ? (
+            <View style={styles.aiLoadingContainer}>
+              <ActivityIndicator
+                size="small"
+                color={mainTab === 'activity' ? '#818CF8' : '#34D399'}
+              />
+              <Text style={styles.aiLoadingText}>Generating AI advisory...</Text>
+            </View>
+          ) : aiBannerError ? (
+            <Text style={styles.aiErrorText}>
+              Unable to generate suggestion. Tap the refresh icon to try again.
             </Text>
-            <ArrowRight size={14} color={mainTab === 'activity' ? '#818CF8' : '#34D399'} />
-          </TouchableOpacity>
+          ) : aiBannerSuggestion ? (
+            <Text style={styles.insightBody}>
+              {renderFormattedText(aiBannerSuggestion, styles.aiNormalText, styles.aiBoldText)}
+            </Text>
+          ) : null}
         </View>
 
         {/* Active Tab View */}
@@ -392,11 +444,16 @@ const styles = StyleSheet.create({
   tabButtonText: { fontSize: 13, fontWeight: '600', color: '#94A3B8' },
   activeTabButtonText: { color: '#F8FAFC', fontWeight: '700' },
 
+  /* Dynamic AI Insight Card Styles */
   insightCard: { backgroundColor: '#151C2C', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#1E293B', marginBottom: 16 },
-  insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   insightTag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   insightTagText: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  insightBody: { fontSize: 13, color: '#94A3B8', lineHeight: 18, marginBottom: 12 },
-  insightAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  insightActionText: { fontSize: 12, fontWeight: '700' },
+  insightBody: { fontSize: 13, color: '#94A3B8', lineHeight: 20 },
+
+  aiLoadingContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  aiLoadingText: { fontSize: 13, color: '#94A3B8' },
+  aiErrorText: { fontSize: 12, color: '#EF4444', paddingVertical: 4 },
+  aiNormalText: { fontSize: 13, color: '#94A3B8', lineHeight: 20 },
+  aiBoldText: { color: '#F8FAFC', fontWeight: '700' },
 });

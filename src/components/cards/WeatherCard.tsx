@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { fetchDashboardWeather } from '../../services/weatherApi';
-import { authApi } from '@/services/authapi';
 import { WeatherResponse } from '../../types/weather';
 import { getUserFromToken } from '../../utils/auth';
 
@@ -30,16 +29,12 @@ export const WeatherCard: React.FC = () => {
         setTokenAvatar(tokenData.avatarUrl);
       }
 
-      // 2. Fetch weather payload from backend
+      // 2. Fetch weather payload from backend (backend uses user's stored profile location)
       const data = await fetchDashboardWeather();
       setWeather(data);
 
-      // 3. Sync resolved location ("Bera, bd") directly to User Profile in background
-      if (data?.location) {
-        await authApi.updateProfile({
-          location: data.location,
-        });
-      }
+      // Note: Automatic profile location sync removed. Location updates now happen
+      // strictly through user action on the Profile Edit screen.
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to load weather update.');
     } finally {

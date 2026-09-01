@@ -19,17 +19,12 @@ export const WellbeingApiService = {
   /**
    * Fetch Wellbeing context, health advisories, and metabolic metrics
    */
-  async getWellbeingContext(latitude?: number, longitude?: number): Promise<WellbeingResponse> {
-    const params = new URLSearchParams();
-    if (latitude !== undefined) params.append('latitude', latitude.toString());
-    if (longitude !== undefined) params.append('longitude', longitude.toString());
-
-    const queryString = params.toString() ? `?${params.toString()}` : '';
-    return apiClient<WellbeingResponse>(`/health/wellbeing${queryString}`, {
-      method: 'GET',
-      requiresAuth: true,
-    });
-  },
+  async getWellbeingContext(): Promise<WellbeingResponse> {
+  return apiClient<WellbeingResponse>('/health/wellbeing', {
+    method: 'GET',
+    requiresAuth: true,
+  });
+},
 
   /**
    * Log a new time-series mood entry

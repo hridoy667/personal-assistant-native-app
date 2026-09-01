@@ -7,7 +7,6 @@ export interface DecodedTokenPayload {
   name: string;
   avatarUrl: string | null;
   district: string;
-  timezone?: string;
   timzone?: string;
   latitude: number | null;
   longitude: number | null;

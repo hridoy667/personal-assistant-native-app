@@ -12,13 +12,13 @@ import { FloatingActionButton } from '@/components/common/FloatingActionButton';
 
 // Context & Helpers
 import { useAuth } from '@/context/AuthContext';
-import { 
-  checkAndRequestUsagePermission, 
-  isUsageStatsAvailable, 
-  syncDeviceScreenTime 
+import {
+  checkAndRequestUsagePermission,
+  isUsageStatsAvailable,
+  syncDeviceScreenTime
 } from '@/utils/screenTimeHelper';
 
-type HomeScreenSection = 
+type HomeScreenSection =
   | { id: 'weather' }
   | { id: 'quran' }
   | { id: 'tasks' }
@@ -35,7 +35,6 @@ export default function HomeScreen() {
   const { logout } = useAuth();
   const insets = useSafeAreaInsets();
 
-  // Check usage availability & permissions on initial load
   useEffect(() => {
     const initializeScreenTime = async () => {
       if (!isUsageStatsAvailable()) {
@@ -51,11 +50,10 @@ export default function HomeScreen() {
     initializeScreenTime();
   }, []);
 
-  // Handler to manually check usage permissions and force a sync
   const handleEnableScreenTime = async () => {
     if (!isUsageStatsAvailable()) {
       Alert.alert(
-        'Not Supported', 
+        'Not Supported',
         'Screen time tracking requires a custom native build and is unavailable in Expo Go.'
       );
       return;
@@ -76,10 +74,8 @@ export default function HomeScreen() {
         return (
           <View style={styles.topCardWrapper}>
             <WeatherCard />
-            
-            {/* Dynamic Card Pocket: Toggles between Sleep/Wake inputs & AI suggestions */}
             <View style={styles.pocketContainer}>
-              <DynamicContextCard 
+              <DynamicContextCard
                 userDefaultSleepTime="23:00"
                 onActionPress={(data) => {
                   if (data.type === 'CRITICAL_TASK') {
@@ -87,12 +83,11 @@ export default function HomeScreen() {
                   } else {
                     // Action for AI Insight
                   }
-                }} 
+                }}
               />
             </View>
           </View>
         );
-
       case 'quran':
         return <QuranCard />;
 
@@ -134,9 +129,9 @@ export default function HomeScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.listContent,
-          { 
+          {
             paddingTop: insets.top + 4,
-            paddingBottom: insets.bottom + 95 
+            paddingBottom: insets.bottom + 95
           }
         ]}
         removeClippedSubviews={false}
@@ -144,7 +139,6 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Floating Action Speed Dial */}
       <FloatingActionButton />
     </View>
   );

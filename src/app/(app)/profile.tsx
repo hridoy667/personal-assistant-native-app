@@ -119,13 +119,17 @@ export default function ProfileScreen() {
     'SEDENTARY' | 'LIGHTLY_ACTIVE' | 'MODERATELY_ACTIVE' | 'VERY_ACTIVE' | ''
   >('');
 
-  // Feature Toggles
+// Feature Toggles
   const [enableIslamicFeatures, setEnableIslamicFeatures] = useState(false);
   const [enableMailAssistance, setEnableMailAssistance] = useState(false);
   const [enableFinanceTracker, setEnableFinanceTracker] = useState(true);
   const [enableHealthTracking, setEnableHealthTracking] = useState(true);
   const [enableScreenTimeTracking, setEnableScreenTimeTracking] = useState(false);
   const [enableAiBriefings, setEnableAiBriefings] = useState(true);
+
+  // Coordinates State (explicitly managed)
+  const [latitude, setLatitude] = useState<number | undefined>(undefined);
+  const [longitude, setLongitude] = useState<number | undefined>(undefined);
 
   // Avatar Image Picker
   const [selectedImage, setSelectedImage] = useState<{
@@ -200,6 +204,10 @@ export default function ProfileScreen() {
       setPhone(data.phone || '');
       setBio(data.bio || '');
 
+      // Existing coordinates
+      setLatitude(data.latitude ?? undefined);
+      setLongitude(data.longitude ?? undefined);
+
       // Schedule & Personality Sync
       setDefaultWakeTime(data.defaultWakeTime || '');
       setDefaultSleepTime(data.defaultSleepTime || '');
@@ -243,11 +251,12 @@ export default function ProfileScreen() {
           | 'VERY_ACTIVE') || 'SEDENTARY'
       );
 
-      setEnableIslamicFeatures(!!data.enableIslamicFeatures);
-      setEnableMailAssistance(!!data.enableMailAssistance);
+      // Explicit boolean parsing
+      setEnableIslamicFeatures(Boolean(data.enableIslamicFeatures));
+      setEnableMailAssistance(Boolean(data.enableMailAssistance));
       setEnableFinanceTracker(data.enableFinanceTracker ?? true);
       setEnableHealthTracking(data.enableHealthTracking ?? true);
-      setEnableScreenTimeTracking(!!data.enableScreenTimeTracking);
+      setEnableScreenTimeTracking(Boolean(data.enableScreenTimeTracking));
       setEnableAiBriefings(data.enableAiBriefings ?? true);
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to fetch user profile.');
@@ -280,22 +289,25 @@ export default function ProfileScreen() {
         return;
       }
 
-      const { latitude, longitude } = currentLoc.coords;
+      const { latitude: lat, longitude: lng } = currentLoc.coords;
+
+      // SAVE COORDINATES TO LOCAL STATE
+      setLatitude(lat);
+      setLongitude(lng);
 
       // 3. Query OpenStreetMap Nominatim for exact Upazila / Town
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`,
         {
           headers: {
-            'User-Agent': 'WeatherApp/1.0', // Nominatim requires a custom User-Agent header
+            'User-Agent': 'WeatherApp/1.0',
           },
         }
       );
       const data = await response.json();
-
       const addr = data.address || {};
 
-      // 4. Resolve exact place name (Prioritizing Upazila/Town level over District/Division)
+      // 4. Resolve exact place name
       const placeName =
         addr.subdistrict ||
         addr.town ||
@@ -306,15 +318,13 @@ export default function ProfileScreen() {
         '';
 
       const countryCode = (addr.country_code || 'bd').toUpperCase();
-
-      // Clean up word "Upazila" if included in string
       const cleanPlaceName = placeName.replace(/\s*Upazila\s*/i, '').trim();
 
-      // 5. Update location state (e.g. "Bera, BD")
+      // 5. Update location text state WITHOUT triggering automatic save
       if (cleanPlaceName) {
         setLocation(`${cleanPlaceName}, ${countryCode}`);
       } else {
-        setLocation(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`);
+        setLocation(`${lat.toFixed(2)}, ${lng.toFixed(2)}`);
       }
     } catch (error) {
       console.error('GPS Location error:', error);
@@ -383,7 +393,8 @@ export default function ProfileScreen() {
       const totalInches = heightFeet * 12 + heightInches;
       const heightInMeters = parseFloat((totalInches * 0.0254).toFixed(2));
 
-      const payload: UpdateAuthPayload = {
+      // Build payload strictly omitting undefined key/value pairs
+      const rawPayload: Record<string, any> = {
         name,
         phone: phone.trim() || undefined,
         bio: bio.trim() || undefined,
@@ -392,14 +403,14 @@ export default function ProfileScreen() {
         personalityType: personalityType || null,
         dateOfBirth: formattedDob,
         location: location.trim() || undefined,
+        latitude: latitude !== undefined ? latitude : undefined,
+        longitude: longitude !== undefined ? longitude : undefined,
         timezone: timezone.trim() || undefined,
         height: heightInMeters,
         weight: weight ? parseFloat(weight) : undefined,
         dailyTargetFocus: dailyTargetFocus.trim() || undefined,
         gender: gender ? (gender as 'MALE' | 'FEMALE') : null,
-        activityLevel: activityLevel
-          ? (activityLevel as 'SEDENTARY' | 'LIGHTLY_ACTIVE' | 'MODERATELY_ACTIVE' | 'VERY_ACTIVE')
-          : undefined,
+        activityLevel: activityLevel || undefined,
         enableIslamicFeatures,
         enableMailAssistance,
         enableFinanceTracker,
@@ -407,6 +418,11 @@ export default function ProfileScreen() {
         enableScreenTimeTracking,
         enableAiBriefings,
       };
+
+      // Clean undefined keys before dispatch
+      const payload = Object.fromEntries(
+        Object.entries(rawPayload).filter(([_, v]) => v !== undefined)
+      ) as UpdateAuthPayload;
 
       const res = await authApi.updateProfile(payload, selectedImage || undefined);
       const updatedUser: AuthUser = (res as any)?.data || res;
@@ -416,9 +432,6 @@ export default function ProfileScreen() {
       setIsEditing(false);
       setShowPersonalityDropdown(false);
       Alert.alert('Success', 'Profile updated successfully!');
-
-      // Sync local state back with updated profile values from server
-      await fetchProfile();
     } catch (error: any) {
       Alert.alert('Update Failed', error?.message || 'Could not update profile.');
     } finally {
@@ -440,7 +453,6 @@ export default function ProfileScreen() {
       </View>
     );
   }
-
   const avatarUri =
     selectedImage?.uri ||
     user?.avatarUrl ||

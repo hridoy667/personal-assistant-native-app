@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 // Define the root tunnel host without /api attached
-const LOCAL_TUNNEL_URL = 'http://192.168.1.4:5000/api';
+const LOCAL_TUNNEL_URL = 'https://compounds-anytime-landscape-rays.trycloudflare.com/api';
 
 // Strip trailing slash if present
 const RAW_BASE = (process.env.EXPO_PUBLIC_API_URL || LOCAL_TUNNEL_URL).replace(/\/$/, '');

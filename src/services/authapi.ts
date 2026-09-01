@@ -160,77 +160,79 @@ export const authApi = {
    * Update profile (PATCH /auth/update - Multipart/Form-Data)
    */
  updateProfile: async (
-  payload: UpdateAuthPayload,
-  image?: UpdateAuthPayload['image']
-): Promise<AuthUser> => {
-  const formData = new FormData();
+    payload: UpdateAuthPayload,
+    image?: UpdateAuthPayload['image']
+  ): Promise<AuthUser> => {
+    const formData = new FormData();
 
-  // Basic Text Fields
-  if (payload.name !== undefined) formData.append('name', payload.name);
-  if (payload.phone !== undefined && payload.phone !== null) formData.append('phone', payload.phone);
-  if (payload.bio !== undefined && payload.bio !== null) formData.append('bio', payload.bio);
-  if (payload.district !== undefined && payload.district !== null) formData.append('district', payload.district);
-  if (payload.upazila !== undefined && payload.upazila !== null) formData.append('upazila', payload.upazila);
-  if (payload.location !== undefined && payload.location !== null) formData.append('location', payload.location);
-  if (payload.timezone !== undefined) formData.append('timezone', payload.timezone);
-  if (payload.dateOfBirth !== undefined && payload.dateOfBirth !== null) formData.append('dateOfBirth', payload.dateOfBirth);
-  if (payload.dailyTargetFocus !== undefined && payload.dailyTargetFocus !== null) {
-    formData.append('dailyTargetFocus', payload.dailyTargetFocus);
-  }
+    // Basic Text Fields
+    if (payload.name !== undefined) formData.append('name', payload.name);
+    if (payload.phone !== undefined && payload.phone !== null) formData.append('phone', payload.phone);
+    if (payload.bio !== undefined && payload.bio !== null) formData.append('bio', payload.bio);
+    if (payload.district !== undefined && payload.district !== null) formData.append('district', payload.district);
+    if (payload.upazila !== undefined && payload.upazila !== null) formData.append('upazila', payload.upazila);
+    if (payload.location !== undefined && payload.location !== null) formData.append('location', payload.location);
+    if (payload.latitude !== undefined && payload.latitude !== null) formData.append('latitude', String(payload.latitude));
+    if (payload.longitude !== undefined && payload.longitude !== null) formData.append('longitude', String(payload.longitude));
+    if (payload.timezone !== undefined) formData.append('timezone', payload.timezone);
+    if (payload.dateOfBirth !== undefined && payload.dateOfBirth !== null) formData.append('dateOfBirth', payload.dateOfBirth);
+    if (payload.dailyTargetFocus !== undefined && payload.dailyTargetFocus !== null) {
+      formData.append('dailyTargetFocus', payload.dailyTargetFocus);
+    }
 
-  // Routine & Personality Fields
-  if (payload.defaultWakeTime !== undefined && payload.defaultWakeTime !== null) {
-    formData.append('defaultWakeTime', payload.defaultWakeTime);
-  }
-  if (payload.defaultSleepTime !== undefined && payload.defaultSleepTime !== null) {
-    formData.append('defaultSleepTime', payload.defaultSleepTime);
-  }
-  if (payload.personalityType !== undefined && payload.personalityType !== null) {
-    formData.append('personalityType', payload.personalityType);
-  }
+    // Routine & Personality Fields
+    if (payload.defaultWakeTime !== undefined && payload.defaultWakeTime !== null) {
+      formData.append('defaultWakeTime', payload.defaultWakeTime);
+    }
+    if (payload.defaultSleepTime !== undefined && payload.defaultSleepTime !== null) {
+      formData.append('defaultSleepTime', payload.defaultSleepTime);
+    }
+    if (payload.personalityType !== undefined && payload.personalityType !== null) {
+      formData.append('personalityType', payload.personalityType);
+    }
 
-  // Enums & Health Metrics
-  if (payload.gender !== undefined && payload.gender !== null) formData.append('gender', payload.gender);
-  if (payload.height !== undefined && payload.height !== null) formData.append('height', String(payload.height));
-  if (payload.weight !== undefined && payload.weight !== null) formData.append('weight', String(payload.weight));
-  if (payload.activityLevel !== undefined) formData.append('activityLevel', payload.activityLevel);
+    // Enums & Health Metrics
+    if (payload.gender !== undefined && payload.gender !== null) formData.append('gender', payload.gender);
+    if (payload.height !== undefined && payload.height !== null) formData.append('height', String(payload.height));
+    if (payload.weight !== undefined && payload.weight !== null) formData.append('weight', String(payload.weight));
+    if (payload.activityLevel !== undefined) formData.append('activityLevel', payload.activityLevel);
 
-  // Feature Flags
-  if (payload.enableIslamicFeatures !== undefined) {
-    formData.append('enableIslamicFeatures', String(payload.enableIslamicFeatures));
-  }
-  if (payload.enableMailAssistance !== undefined) {
-    formData.append('enableMailAssistance', String(payload.enableMailAssistance));
-  }
-  if (payload.enableFinanceTracker !== undefined) {
-    formData.append('enableFinanceTracker', String(payload.enableFinanceTracker));
-  }
-  if (payload.enableHealthTracking !== undefined) {
-    formData.append('enableHealthTracking', String(payload.enableHealthTracking));
-  }
-  if (payload.enableScreenTimeTracking !== undefined) {
-    formData.append('enableScreenTimeTracking', String(payload.enableScreenTimeTracking));
-  }
-  if (payload.enableAiBriefings !== undefined) {
-    formData.append('enableAiBriefings', String(payload.enableAiBriefings));
-  }
+    // Feature Flags
+    if (payload.enableIslamicFeatures !== undefined) {
+      formData.append('enableIslamicFeatures', String(payload.enableIslamicFeatures));
+    }
+    if (payload.enableMailAssistance !== undefined) {
+      formData.append('enableMailAssistance', String(payload.enableMailAssistance));
+    }
+    if (payload.enableFinanceTracker !== undefined) {
+      formData.append('enableFinanceTracker', String(payload.enableFinanceTracker));
+    }
+    if (payload.enableHealthTracking !== undefined) {
+      formData.append('enableHealthTracking', String(payload.enableHealthTracking));
+    }
+    if (payload.enableScreenTimeTracking !== undefined) {
+      formData.append('enableScreenTimeTracking', String(payload.enableScreenTimeTracking));
+    }
+    if (payload.enableAiBriefings !== undefined) {
+      formData.append('enableAiBriefings', String(payload.enableAiBriefings));
+    }
 
-  // Profile Image Upload
-  const avatarImage = image || payload.image;
-  if (avatarImage) {
-    formData.append('image', {
-      uri: avatarImage.uri,
-      name: avatarImage.name || 'avatar.jpg',
-      type: avatarImage.type || 'image/jpeg',
-    } as unknown as Blob);
-  }
+    // Profile Image Upload
+    const avatarImage = image || payload.image;
+    if (avatarImage) {
+      formData.append('image', {
+        uri: avatarImage.uri,
+        name: avatarImage.name || 'avatar.jpg',
+        type: avatarImage.type || 'image/jpeg',
+      } as unknown as Blob);
+    }
 
-  return apiClient<AuthUser>('/auth/update', {
-    method: 'PATCH',
-    body: formData,
-    requiresAuth: true,
-  });
-},
+    return apiClient<AuthUser>('/auth/update', {
+      method: 'PATCH',
+      body: formData,
+      requiresAuth: true,
+    });
+  },
 
   /**
    * Complete OAuth Profile (POST /auth/complete-profile - Multipart/Form-Data)

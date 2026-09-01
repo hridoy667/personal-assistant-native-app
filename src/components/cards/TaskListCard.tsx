@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts, PatrickHand_400Regular } from '@expo-google-fonts/patrick-hand';
@@ -15,12 +18,18 @@ import {
   ArrowRight,
   Eye,
   NotebookPen,
+  Sparkles,
 } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { taskService } from '@/services/task.service';
 import { Task, TaskPriority, CreateTaskPayload } from '@/types/task';
 import { TaskDetailModal } from '../modals/TaskDetailModal';
 import { eventBus } from '@/utils/eventBus';
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface TaskListCardProps {
   ListHeaderComponent?: React.ReactElement;
@@ -84,24 +93,23 @@ export function TaskListCard({
   }, []);
 
   const handleToggle = async (id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
-    );
+    // 1. Configure smooth layout animation for item removal/exit
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+    // 2. Immediately remove completed task from local list for responsive UX
+    setTasks((prev) => prev.filter((t) => t.id !== id));
 
     if (selectedTask?.id === id) {
-      setSelectedTask((prev) => (prev ? { ...prev, isCompleted: !prev.isCompleted } : null));
+      handleCloseModal();
     }
 
     try {
       await taskService.toggleTask(id);
       eventBus.emit('TASK_UPDATED');
     } catch (error) {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
-      );
-      if (selectedTask?.id === id) {
-        setSelectedTask((prev) => (prev ? { ...prev, isCompleted: !prev.isCompleted } : null));
-      }
+      console.error('Failed to toggle task status:', error);
+      // Revert if API call fails
+      loadInitialTasks();
     }
   };
 
@@ -117,6 +125,7 @@ export function TaskListCard({
   };
 
   const handleDeleteTask = async (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setTasks((prev) => prev.filter((t) => t.id !== id));
     handleCloseModal();
 
@@ -253,13 +262,16 @@ export function TaskListCard({
           <View pointerEvents="box-none">
             {ListHeaderComponent}
             <LinearGradient
-              colors={['#111729', '#1E1B4B']}
+              colors={['#111729', '#1e1b4b']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.cardHeader}
+              style={[
+                styles.cardHeader,
+                tasks.length === 0 && !loading && styles.cardHeaderNoBorder,
+              ]}
             >
               <View style={styles.titleGroup}>
-                <NotebookPen size={16} color="#3b82f6" />
+                <NotebookPen size={18} color="#38bdf8" />
                 <Text style={[styles.cardTitle, fontStyle]}>Priority Scratchpad</Text>
               </View>
               {tasks.length > 0 && (
@@ -273,12 +285,13 @@ export function TaskListCard({
         ListEmptyComponent={
           loading ? (
             <View style={styles.emptyContainer}>
-              <ActivityIndicator size="small" color="#3b82f6" />
+              <ActivityIndicator size="small" color="#38bdf8" />
             </View>
           ) : (
             <View style={styles.emptyContainer}>
+              <Sparkles size={18} color="#38bdf8" style={{ marginBottom: 6 }} />
               <Text style={[styles.emptyText, fontStyle]}>
-                ✨ Notepad empty! Clear schedule ahead.
+                Notepad empty! Clear schedule ahead.
               </Text>
             </View>
           )
@@ -288,17 +301,17 @@ export function TaskListCard({
             {!loading && tasks.length > 0 && (
               <TouchableOpacity
                 onPress={handleNavigateToTasks}
-                activeOpacity={0.7}
+                activeOpacity={0.8}
                 style={styles.footerTouchable}
               >
                 <LinearGradient
-                  colors={['#111729', '#1E1B4B']}
+                  colors={['#111729', '#1e1b4b']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.footerButton}
                 >
                   <Text style={[styles.footerText, fontStyle]}>View All Tasks</Text>
-                  <ArrowRight size={14} color="#3b82f6" />
+                  <ArrowRight size={14} color="#38bdf8" />
                 </LinearGradient>
               </TouchableOpacity>
             )}
@@ -342,26 +355,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
+  cardHeaderNoBorder: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
   titleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: '#f8fafc',
   },
   badge: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    paddingHorizontal: 10,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.25)',
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: '#38bdf8',
   },
   taskRow: {
     backgroundColor: '#111729',
@@ -372,7 +391,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 15,
   },
   taskRowBorder: {
     borderBottomWidth: 1,
@@ -382,12 +401,12 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
     paddingRight: 12,
   },
   taskTitle: {
     fontSize: 16,
-    color: '#cbd5e1',
+    color: '#e2e8f0',
     fontWeight: '400',
   },
   completedTaskTitle: {
@@ -396,6 +415,8 @@ const styles = StyleSheet.create({
   },
   actionIconButton: {
     padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(30, 41, 59, 0.4)',
   },
   emptyContainer: {
     backgroundColor: '#111729',
@@ -405,12 +426,13 @@ const styles = StyleSheet.create({
     borderColor: '#1e293b',
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
-    paddingVertical: 20,
+    paddingVertical: 24,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
-    fontSize: 13,
-    color: '#64748b',
+    fontSize: 14,
+    color: '#94a3b8',
     fontWeight: '500',
   },
   footerTouchable: {
@@ -429,11 +451,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 12,
+    paddingVertical: 13,
   },
   footerText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#3b82f6',
+    color: '#38bdf8',
   },
 });

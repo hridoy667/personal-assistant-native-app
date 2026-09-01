@@ -158,6 +158,8 @@ export interface UpdateAuthPayload {
   district?: string;
   upazila?: string;
   location?: string;
+  latitude?:number;
+  longitude?:number;
   timezone?: string;
   defaultWakeTime?: string; // HH:mm format (e.g. "06:00")
   defaultSleepTime?: string; // HH:mm format (e.g. "23:00")
