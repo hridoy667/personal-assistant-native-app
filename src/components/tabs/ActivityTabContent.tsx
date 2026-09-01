@@ -242,7 +242,7 @@ export const ActivityTabContent: React.FC<ActivityTabContentProps> = ({
 
       {/* 6. Daily Habits Section */}
       <HabitSectionCard onHabitChange={onHabitChange} />
-
+  
       {/* 7. Environmental & Activity Insights */}
       {hasInsightsOrAlerts && (
         <View style={styles.card}>

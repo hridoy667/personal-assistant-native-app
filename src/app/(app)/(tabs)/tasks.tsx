@@ -10,10 +10,21 @@ import {
   ActivityIndicator,
   RefreshControl,
   StatusBar,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Search, Sparkles, Lightbulb, ArrowRight } from 'lucide-react-native';
+import {
+  Plus,
+  Search,
+  Sparkles,
+  Lightbulb,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+} from 'lucide-react-native';
 
 import { TaskItem } from '@/components/TaskItem';
 import { TaskFormModal } from '@/components/modals/TaskFormModal';
@@ -24,10 +35,20 @@ import { AiGeneratingLoader } from '@/components/skills/AiGeneratingLoader';
 
 import { Task, CreateTaskPayload } from '@/types/task';
 import { Skill, GenerateSkillRoadmapDto, UpdateSkillDto } from '@/types/skills';
+import { SuggestionContextType } from '@/types/ai';
 
 import { taskService } from '@/services/task.service';
 import { SkillsApiService } from '@/services/skillsService';
+import { aiService } from '@/services/aiService';
 import { eventBus } from '@/utils/eventBus';
+import { renderFormattedText } from '@/utils/textFormatter';
+
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const PAGE_LIMIT = 10;
 
@@ -39,6 +60,11 @@ export default function TasksScreen() {
   const [aiGenerating, setAiGenerating] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // AI Suggestion State
+  const [suggestion, setSuggestion] = useState<string>('');
+  const [loadingSuggestion, setLoadingSuggestion] = useState<boolean>(false);
+  const [isAccordionExpanded, setIsAccordionExpanded] = useState<boolean>(false);
 
   // Modals & Editing State
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -77,13 +103,33 @@ export default function TasksScreen() {
     }
   }, []);
 
+  const fetchAiSuggestion = useCallback(async (isRefresh = false) => {
+    try {
+      setLoadingSuggestion(true);
+      const contextType = isSkillsTab
+        ? SuggestionContextType.GENERAL
+        : SuggestionContextType.TASK_OPTIMIZATION;
+
+      const response = isRefresh
+        ? await aiService.refreshSuggestion({ contextType })
+        : await aiService.generateSuggestion({ contextType });
+
+      setSuggestion(response.suggestion || '');
+    } catch {
+      setSuggestion('Unable to load AI suggestions right now.');
+    } finally {
+      setLoadingSuggestion(false);
+    }
+  }, [isSkillsTab]);
+
   useEffect(() => {
     if (mainTab === 'tasks') {
       fetchTasks();
     } else {
       fetchSkills();
     }
-  }, [mainTab, fetchTasks, fetchSkills]);
+    fetchAiSuggestion();
+  }, [mainTab, fetchTasks, fetchSkills, fetchAiSuggestion]);
 
   // Subscribe to task events across the app
   useEffect(() => {
@@ -99,6 +145,11 @@ export default function TasksScreen() {
       unsubUpdated();
     };
   }, [fetchTasks]);
+
+  const toggleAccordion = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsAccordionExpanded((prev) => !prev);
+  };
 
   const handleTaskSubmit = async (payload: CreateTaskPayload) => {
     try {
@@ -238,7 +289,15 @@ export default function TasksScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={mainTab === 'tasks' ? fetchTasks : fetchSkills}
+            onRefresh={() => {
+              setRefreshing(true);
+              if (mainTab === 'tasks') {
+                fetchTasks();
+              } else {
+                fetchSkills();
+              }
+              fetchAiSuggestion();
+            }}
             tintColor={isSkillsTab ? '#10B981' : '#6366F1'}
           />
         }
@@ -281,30 +340,61 @@ export default function TasksScreen() {
             {/* Top Navigation Tabs */}
             <TasksTopTabs activeTab={mainTab} onSelectTab={setMainTab} />
 
-            {/* AI Insight Banner */}
+            {/* AI Suggestion Accordion Card */}
             <View style={styles.insightCard}>
               <View style={styles.insightHeader}>
                 <View style={styles.insightTag}>
                   <Lightbulb size={14} color={isSkillsTab ? '#34D399' : '#818CF8'} />
                   <Text style={[styles.insightTagText, isSkillsTab && styles.insightTagTextSkills]}>
-                    {mainTab === 'tasks' ? 'TASK OPTIMIZER' : 'AI ROADMAP COACH'}
+                    {mainTab === 'tasks' ? 'AI TASK OPTIMIZATION' : 'AI SKILL INSIGHTS'}
                   </Text>
                 </View>
-                <Sparkles size={16} color="#64748B" />
+                <View style={styles.headerControls}>
+                  <TouchableOpacity
+                    onPress={() => fetchAiSuggestion(true)}
+                    disabled={loadingSuggestion}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <RefreshCw
+                      size={14}
+                      color={isSkillsTab ? '#34D399' : '#818CF8'}
+                      style={loadingSuggestion ? styles.spinningIcon : undefined}
+                    />
+                  </TouchableOpacity>
+                  <Sparkles size={16} color="#64748B" />
+                </View>
               </View>
 
-              <Text style={styles.insightBody}>
-                {mainTab === 'tasks'
-                  ? 'You have high-priority tasks pending today. Complete them during peak focus hours.'
-                  : 'AI decomposes skills into video resources, theory, and exercises to boost learning efficiency.'}
-              </Text>
+              {loadingSuggestion ? (
+                <View style={styles.loaderContainer}>
+                  <ActivityIndicator size="small" color={isSkillsTab ? '#10B981' : '#6366F1'} />
+                  <Text style={styles.loaderText}>Fetching AI Insights...</Text>
+                </View>
+              ) : (
+                <>
+                  <Text
+                    style={styles.insightBody}
+                    numberOfLines={isAccordionExpanded ? undefined : 2}
+                  >
+                    {renderFormattedText(suggestion, styles.insightTextBase, styles.insightTextBold)}
+                  </Text>
 
-              <TouchableOpacity style={styles.insightAction} activeOpacity={0.7}>
-                <Text style={[styles.insightActionText, isSkillsTab && styles.insightActionTextSkills]}>
-                  {mainTab === 'tasks' ? 'Prioritize Schedule' : 'Explore Skill Analytics'}
-                </Text>
-                <ArrowRight size={14} color={isSkillsTab ? '#34D399' : '#818CF8'} />
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.accordionToggle}
+                    onPress={toggleAccordion}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.accordionToggleText, isSkillsTab && styles.accordionToggleTextSkills]}>
+                      {isAccordionExpanded ? 'Show Less' : 'View Full Suggestion'}
+                    </Text>
+                    {isAccordionExpanded ? (
+                      <ChevronUp size={14} color={isSkillsTab ? '#34D399' : '#818CF8'} />
+                    ) : (
+                      <ChevronDown size={14} color={isSkillsTab ? '#34D399' : '#818CF8'} />
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
 
             {/* Search Input (Tasks Tab Only) */}
@@ -377,14 +467,20 @@ const styles = StyleSheet.create({
   addBtnGradient: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 6 },
   addBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
   insightCard: { backgroundColor: '#151C2C', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#1E293B', marginBottom: 16 },
-  insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   insightTag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   insightTagText: { fontSize: 11, fontWeight: '800', letterSpacing: 1, color: '#818CF8' },
   insightTagTextSkills: { color: '#34D399' },
-  insightBody: { fontSize: 13, color: '#94A3B8', lineHeight: 18, marginBottom: 12 },
-  insightAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  insightActionText: { fontSize: 12, fontWeight: '700', color: '#818CF8' },
-  insightActionTextSkills: { color: '#34D399' },
+  headerControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  spinningIcon: { opacity: 0.6 },
+  loaderContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
+  loaderText: { fontSize: 12, color: '#94A3B8' },
+  insightBody: { marginBottom: 10 },
+  insightTextBase: { fontSize: 13, color: '#94A3B8', lineHeight: 19 },
+  insightTextBold: { color: '#F8FAFC' },
+  accordionToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 4 },
+  accordionToggleText: { fontSize: 12, fontWeight: '700', color: '#818CF8' },
+  accordionToggleTextSkills: { color: '#34D399' },
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#151C2C', borderRadius: 12, paddingHorizontal: 14, height: 48, borderWidth: 1, borderColor: '#1E293B', marginBottom: 16 },
   searchInput: { flex: 1, color: '#F8FAFC', fontSize: 14, marginLeft: 10 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50 },

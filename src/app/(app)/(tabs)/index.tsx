@@ -1,5 +1,13 @@
-import React, { useEffect } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogOut } from 'lucide-react-native';
 
@@ -8,26 +16,34 @@ import { QuranCard } from '@/components/cards/QuranCard';
 import { TaskListCard } from '@/components/cards/TaskListCard';
 import { WeatherCard } from '@/components/cards/WeatherCard';
 import { DynamicContextCard } from '@/components/cards/DynamicContextCard';
+import { TodayOverviewCard } from '@/components/cards/TodayOverviewCard';
+import { EodSuggestionCard } from '@/components/cards/EodSuggestionCard';
 import { FloatingActionButton } from '@/components/common/FloatingActionButton';
 
-// Context & Helpers
+// Context & Services & Types
 import { useAuth } from '@/context/AuthContext';
+import { dashboardService } from '@/services/dashboardService';
+import { TodayOverviewResponse } from '@/types/dashboard';
 import {
   checkAndRequestUsagePermission,
   isUsageStatsAvailable,
-  syncDeviceScreenTime
+  syncDeviceScreenTime,
 } from '@/utils/screenTimeHelper';
 
 type HomeScreenSection =
   | { id: 'weather' }
   | { id: 'quran' }
   | { id: 'tasks' }
+  | { id: 'overview' }
+  | { id: 'eod_suggestion' }
   | { id: 'footer' };
 
 const SECTIONS: HomeScreenSection[] = [
   { id: 'weather' },
   { id: 'quran' },
   { id: 'tasks' },
+  { id: 'overview' },
+  { id: 'eod_suggestion' },
   { id: 'footer' },
 ];
 
@@ -35,7 +51,30 @@ export default function HomeScreen() {
   const { logout } = useAuth();
   const insets = useSafeAreaInsets();
 
+  // Today Overview State
+  const [overviewData, setOverviewData] = useState<TodayOverviewResponse | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState<boolean>(true);
+  const [overviewError, setOverviewError] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  // Fetch Today Overview Data
+  const fetchOverview = useCallback(async () => {
+    try {
+      setOverviewError(false);
+      const data = await dashboardService.getTodayOverview();
+      setOverviewData(data);
+    } catch (error) {
+      console.error('[HomeScreen] Failed to fetch today overview:', error);
+      setOverviewError(true);
+    } finally {
+      setOverviewLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
   useEffect(() => {
+    fetchOverview();
+
     const initializeScreenTime = async () => {
       if (!isUsageStatsAvailable()) {
         return;
@@ -48,24 +87,11 @@ export default function HomeScreen() {
     };
 
     initializeScreenTime();
-  }, []);
+  }, [fetchOverview]);
 
-  const handleEnableScreenTime = async () => {
-    if (!isUsageStatsAvailable()) {
-      Alert.alert(
-        'Not Supported',
-        'Screen time tracking requires a custom native build and is unavailable in Expo Go.'
-      );
-      return;
-    }
-
-    const granted = await checkAndRequestUsagePermission();
-    if (granted) {
-      const synced = await syncDeviceScreenTime();
-      if (synced) {
-        Alert.alert('Success', 'Screen time synced successfully!');
-      }
-    }
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchOverview();
   };
 
   const renderSection = ({ item }: { item: HomeScreenSection }) => {
@@ -88,30 +114,32 @@ export default function HomeScreen() {
             </View>
           </View>
         );
+
       case 'quran':
         return <QuranCard />;
 
       case 'tasks':
         return <TaskListCard />;
 
+      case 'overview':
+        return (
+          <TodayOverviewCard
+            data={overviewData}
+            loading={overviewLoading}
+            error={overviewError}
+            onRefresh={fetchOverview}
+          />
+        );
+
+      case 'eod_suggestion':
+        return <EodSuggestionCard />;
+
       case 'footer':
         return (
           <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.screenTimeButton}
-              onPress={handleEnableScreenTime}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.screenTimeText}>Enable Screen Time Tracking</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.logoutButton}
-              onPress={logout}
-              activeOpacity={0.7}
-            >
-              <LogOut size={16} color="#ef4444" />
-              <Text style={styles.logoutText}>Logout & Clear Storage</Text>
+            <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+              <LogOut size={18} color="#ef4444" />
+              <Text style={styles.logoutText}>Sign Out</Text>
             </TouchableOpacity>
           </View>
         );
@@ -131,9 +159,17 @@ export default function HomeScreen() {
           styles.listContent,
           {
             paddingTop: insets.top + 4,
-            paddingBottom: insets.bottom + 95
-          }
+            paddingBottom: insets.bottom + 95,
+          },
         ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#6366F1"
+            colors={['#6366F1']}
+          />
+        }
         removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

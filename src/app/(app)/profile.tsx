@@ -24,6 +24,7 @@ import {
   ChevronDown,
   Clock,
   Lock,
+  LogOut,
   MapPin,
   Pencil,
   Ruler,
@@ -84,6 +85,9 @@ export default function ProfileScreen() {
   const [fetchingLocation, setFetchingLocation] = useState(false);
   // Edit mode
   const [isEditing, setIsEditing] = useState<boolean>(false);
+
+  // Logout state
+  const [loggingOut, setLoggingOut] = useState<boolean>(false);
 
   // Basic Information
   const [name, setName] = useState('');
@@ -446,6 +450,28 @@ export default function ProfileScreen() {
     fetchProfile();
   };
 
+  // Logout handler — confirms, calls authApi.logout, then redirects to login
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: async () => {
+          setLoggingOut(true);
+          try {
+            await authApi.logout();
+          } catch {
+            // Ignore network errors during logout flow (already handled in service)
+          } finally {
+            setLoggingOut(false);
+            router.replace('/(auth)/login' as any);
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={[styles.screen, styles.center, { paddingTop: insets.top }]}>
@@ -461,479 +487,499 @@ export default function ProfileScreen() {
     )}&background=3b82f6&color=fff&bold=true`;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
-          <ArrowLeft size={20} color="#f8fafc" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => (isEditing ? handleCancelEdit() : setIsEditing(true))}
-          activeOpacity={0.7}
-        >
-          {isEditing ? <X size={18} color="#f8fafc" /> : <Pencil size={16} color="#f8fafc" />}
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <View style={styles.screen}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.avatarSection}>
-          <View style={styles.avatarContainer}>
-            <Image source={{ uri: avatarUri }} style={styles.avatar} />
-            {isEditing && (
-              <TouchableOpacity style={styles.cameraBadge} onPress={handlePickImage} activeOpacity={0.8}>
-                <Camera size={16} color="#ffffff" />
-              </TouchableOpacity>
-            )}
-          </View>
-          {isEditing && <Text style={styles.changePhotoText}>Tap camera icon to change photo</Text>}
-        </View>
-
-        <Text style={styles.sectionTitle}>Basic Details</Text>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Email Address (Read-Only)</Text>
-          <View style={[styles.inputContainer, styles.disabledInput]}>
-            <TextInput style={[styles.input, { color: '#64748b' }]} value={user?.email || ''} editable={false} />
-            <Lock size={16} color="#64748b" />
-          </View>
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Full Name</Text>
-          <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="Enter full name"
-              placeholderTextColor="#475569"
-              editable={isEditing}
-            />
-            <UserIcon size={16} color="#64748b" />
-          </View>
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Phone Number</Text>
-          <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
-            <TextInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="+8801700000000"
-              placeholderTextColor="#475569"
-              keyboardType="phone-pad"
-              editable={isEditing}
-            />
-          </View>
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Date of Birth</Text>
-          <TouchableOpacity
-            onPress={() => isEditing && setShowDatePicker(true)}
-            activeOpacity={0.7}
-            style={[styles.inputContainer, !isEditing && styles.disabledInput]}
-            disabled={!isEditing}
-          >
-            <Calendar size={16} color="#64748b" style={{ marginRight: 8 }} />
-            <Text style={[styles.dateText, !dobDate && styles.placeholderText]}>
-              {dobDate ? formatLocalDate(dobDate) : 'YYYY-MM-DD'}
-            </Text>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
+            <ArrowLeft size={20} color="#f8fafc" />
           </TouchableOpacity>
+          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => (isEditing ? handleCancelEdit() : setIsEditing(true))}
+            activeOpacity={0.7}
+          >
+            {isEditing ? <X size={18} color="#f8fafc" /> : <Pencil size={16} color="#f8fafc" />}
+          </TouchableOpacity>
+        </View>
 
-          {isEditing && showDatePicker && (
-            <View style={styles.datePickerContainer}>
-              <DateTimePicker
-                value={dobDate || new Date(2000, 0, 1)}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                maximumDate={new Date()}
-                onChange={handleDateChange}
-              />
-              {Platform.OS === 'ios' && (
-                <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.datePickerDoneButton}>
-                  <Text style={styles.datePickerDoneText}>Done</Text>
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarContainer}>
+              <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              {isEditing && (
+                <TouchableOpacity style={styles.cameraBadge} onPress={handlePickImage} activeOpacity={0.8}>
+                  <Camera size={16} color="#ffffff" />
                 </TouchableOpacity>
               )}
             </View>
-          )}
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Bio</Text>
-          <View style={[styles.inputContainer, styles.textAreaContainer, !isEditing && styles.disabledInput]}>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={bio}
-              onChangeText={setBio}
-              placeholder="Tell us about yourself..."
-              placeholderTextColor="#475569"
-              multiline
-              numberOfLines={3}
-              editable={isEditing}
-            />
-          </View>
-        </View>
-
-        {/* Section: Routine & Personality */}
-        <Text style={styles.sectionTitle}>Routine & Personality</Text>
-
-        <View style={styles.rowFields}>
-          {/* Wake Time Picker */}
-          <View style={[styles.fieldGroup, { flex: 1 }]}>
-            <Text style={styles.label}>Wake Time</Text>
-            <TouchableOpacity
-              onPress={() => isEditing && setShowWakePicker(true)}
-              activeOpacity={0.7}
-              style={[styles.inputContainer, !isEditing && styles.disabledInput]}
-              disabled={!isEditing}
-            >
-              <Clock size={16} color="#64748b" style={{ marginRight: 6 }} />
-              <Text style={styles.input}>
-                {formatTimeAMPM(defaultWakeTime || wakeTimeDate)}
-              </Text>
-            </TouchableOpacity>
-
-            {isEditing && showWakePicker && (
-              <View style={styles.datePickerContainer}>
-                <DateTimePicker
-                  value={wakeTimeDate}
-                  mode="time"
-                  is24Hour={false}
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={handleWakeTimeChange}
-                />
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity onPress={() => setShowWakePicker(false)} style={styles.datePickerDoneButton}>
-                    <Text style={styles.datePickerDoneText}>Done</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
+            {isEditing && <Text style={styles.changePhotoText}>Tap camera icon to change photo</Text>}
           </View>
 
-          {/* Sleep Time Picker */}
-          <View style={[styles.fieldGroup, { flex: 1 }]}>
-            <Text style={styles.label}>Sleep Time</Text>
-            <TouchableOpacity
-              onPress={() => isEditing && setShowSleepPicker(true)}
-              activeOpacity={0.7}
-              style={[styles.inputContainer, !isEditing && styles.disabledInput]}
-              disabled={!isEditing}
-            >
-              <Clock size={16} color="#64748b" style={{ marginRight: 6 }} />
-              <Text style={styles.input}>
-                {formatTimeAMPM(defaultSleepTime || sleepTimeDate)}
-              </Text>
-            </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Basic Details</Text>
 
-            {isEditing && showSleepPicker && (
-              <View style={styles.datePickerContainer}>
-                <DateTimePicker
-                  value={sleepTimeDate}
-                  mode="time"
-                  is24Hour={false}
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={handleSleepTimeChange}
-                />
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity onPress={() => setShowSleepPicker(false)} style={styles.datePickerDoneButton}>
-                    <Text style={styles.datePickerDoneText}>Done</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Personality Dropdown */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Personality Type</Text>
-          <TouchableOpacity
-            style={[styles.dropdownContainer, !isEditing && styles.disabledInput]}
-            onPress={() => isEditing && setShowPersonalityDropdown(!showPersonalityDropdown)}
-            activeOpacity={0.8}
-            disabled={!isEditing}
-          >
-            <Text style={styles.dropdownText}>
-              {personalityType ? personalityType.replace('_', ' ') : 'Select Personality Type'}
-            </Text>
-            <ChevronDown size={18} color="#64748b" />
-          </TouchableOpacity>
-
-          {isEditing && showPersonalityDropdown && (
-            <View style={styles.dropdownMenu}>
-              <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
-                {PERSONALITY_TYPES.map((type) => {
-                  const isSelected = personalityType === type;
-                  return (
-                    <TouchableOpacity
-                      key={type}
-                      style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
-                      onPress={() => {
-                        setPersonalityType(isSelected ? null : type);
-                        setShowPersonalityDropdown(false);
-                      }}
-                    >
-                      <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}>
-                        {type.replace('_', ' ')}
-                      </Text>
-                      {isSelected && <Check size={16} color="#3b82f6" />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Email Address (Read-Only)</Text>
+            <View style={[styles.inputContainer, styles.disabledInput]}>
+              <TextInput style={[styles.input, { color: '#64748b' }]} value={user?.email || ''} editable={false} />
+              <Lock size={16} color="#64748b" />
             </View>
-          )}
-        </View>
-
-        {/* Section: Location Details */}
-        <Text style={styles.sectionTitle}>Location Information</Text>
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Location</Text>
-          <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
-            <TextInput
-              style={styles.input}
-              value={location}
-              onChangeText={setLocation}
-              placeholder="Detailed location address"
-              placeholderTextColor="#475569"
-              editable={isEditing}
-            />
-            <TouchableOpacity
-              onPress={handleGetGPSLocation}
-              disabled={!isEditing || fetchingLocation}
-              activeOpacity={0.7}
-              style={{ paddingLeft: 8, opacity: !isEditing ? 0.4 : 1 }}
-            >
-              {fetchingLocation ? (
-                <ActivityIndicator size="small" color="#3b82f6" />
-              ) : (
-                <MapPin size={18} color={!isEditing ? '#94a3b8' : '#3b82f6'} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Section: Health & Focus Metrics */}
-        <Text style={styles.sectionTitle}>Health & Daily Focus</Text>
-
-        <View style={styles.rowFields}>
-          <View style={[styles.fieldGroup, { flex: 1.6 }]}>
-            <Text style={styles.label}>Height</Text>
-            {isEditing ? (
-              <View style={styles.heightPickerRow}>
-                <View style={styles.heightSegment}>
-                  <Ruler color="#64748b" size={14} />
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSelector}>
-                    {[3, 4, 5, 6, 7].map((ft) => (
-                      <TouchableOpacity
-                        key={ft}
-                        style={[styles.unitChip, heightFeet === ft && styles.unitChipActive]}
-                        onPress={() => setHeightFeet(ft)}
-                      >
-                        <Text style={[styles.unitChipText, heightFeet === ft && styles.unitChipTextActive]}>
-                          {ft}'
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-
-                <View style={styles.heightSegment}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSelector}>
-                    {Array.from({ length: 12 }, (_, i) => i).map((inch) => (
-                      <TouchableOpacity
-                        key={inch}
-                        style={[styles.unitChip, heightInches === inch && styles.unitChipActive]}
-                        onPress={() => setHeightInches(inch)}
-                      >
-                        <Text style={[styles.unitChipText, heightInches === inch && styles.unitChipTextActive]}>
-                          {inch}"
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              </View>
-            ) : (
-              <View style={[styles.inputContainer, styles.disabledInput]}>
-                <Ruler color="#64748b" size={14} style={{ marginRight: 8 }} />
-                <Text style={styles.input}>{`${heightFeet}'${heightInches}''`}</Text>
-              </View>
-            )}
           </View>
 
-          <View style={[styles.fieldGroup, { flex: 1 }]}>
-            <Text style={styles.label}>Weight</Text>
-            <View style={[styles.weightInputContainer, !isEditing && styles.disabledInput]}>
-              <WeightIcon color="#64748b" size={14} />
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Full Name</Text>
+            <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
               <TextInput
-                value={weight}
-                onChangeText={setWeight}
-                placeholder="70.5"
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                placeholder="Enter full name"
                 placeholderTextColor="#475569"
-                keyboardType="decimal-pad"
-                style={styles.weightInput}
                 editable={isEditing}
               />
-              <Text style={styles.unitSuffix}>kg</Text>
+              <UserIcon size={16} color="#64748b" />
             </View>
           </View>
-        </View>
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Daily Target Focus</Text>
-          <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
-            <TextInput
-              style={styles.input}
-              value={dailyTargetFocus}
-              onChangeText={setDailyTargetFocus}
-              placeholder="e.g. Fitness, Coding, Productivity"
-              placeholderTextColor="#475569"
-              editable={isEditing}
-            />
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Phone Number</Text>
+            <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
+              <TextInput
+                style={styles.input}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+8801700000000"
+                placeholderTextColor="#475569"
+                keyboardType="phone-pad"
+                editable={isEditing}
+              />
+            </View>
           </View>
-        </View>
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Gender</Text>
-          <View style={styles.pillRow}>
-            {(['MALE', 'FEMALE'] as const).map((g) => (
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Date of Birth</Text>
+            <TouchableOpacity
+              onPress={() => isEditing && setShowDatePicker(true)}
+              activeOpacity={0.7}
+              style={[styles.inputContainer, !isEditing && styles.disabledInput]}
+              disabled={!isEditing}
+            >
+              <Calendar size={16} color="#64748b" style={{ marginRight: 8 }} />
+              <Text style={[styles.dateText, !dobDate && styles.placeholderText]}>
+                {dobDate ? formatLocalDate(dobDate) : 'YYYY-MM-DD'}
+              </Text>
+            </TouchableOpacity>
+
+            {isEditing && showDatePicker && (
+              <View style={styles.datePickerContainer}>
+                <DateTimePicker
+                  value={dobDate || new Date(2000, 0, 1)}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  maximumDate={new Date()}
+                  onChange={handleDateChange}
+                />
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.datePickerDoneButton}>
+                    <Text style={styles.datePickerDoneText}>Done</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Bio</Text>
+            <View style={[styles.inputContainer, styles.textAreaContainer, !isEditing && styles.disabledInput]}>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={bio}
+                onChangeText={setBio}
+                placeholder="Tell us about yourself..."
+                placeholderTextColor="#475569"
+                multiline
+                numberOfLines={3}
+                editable={isEditing}
+              />
+            </View>
+          </View>
+
+          {/* Section: Routine & Personality */}
+          <Text style={styles.sectionTitle}>Routine & Personality</Text>
+
+          <View style={styles.rowFields}>
+            {/* Wake Time Picker */}
+            <View style={[styles.fieldGroup, { flex: 1 }]}>
+              <Text style={styles.label}>Wake Time</Text>
               <TouchableOpacity
-                key={g}
-                style={[
-                  styles.pillButton,
-                  gender === g && styles.pillButtonActive,
-                  !isEditing && styles.disabledPill,
-                ]}
-                onPress={() => isEditing && setGender(g)}
+                onPress={() => isEditing && setShowWakePicker(true)}
+                activeOpacity={0.7}
+                style={[styles.inputContainer, !isEditing && styles.disabledInput]}
                 disabled={!isEditing}
               >
-                <Text style={[styles.pillText, gender === g && styles.pillTextActive]}>{g}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Activity Level</Text>
-          <View style={styles.pillWrap}>
-            {(['SEDENTARY', 'LIGHTLY_ACTIVE', 'MODERATELY_ACTIVE', 'VERY_ACTIVE'] as const).map((level) => (
-              <TouchableOpacity
-                key={level}
-                style={[
-                  styles.pillButton,
-                  activityLevel === level && styles.pillButtonActive,
-                  !isEditing && styles.disabledPill,
-                ]}
-                onPress={() => isEditing && setActivityLevel(level)}
-                disabled={!isEditing}
-              >
-                <Text style={[styles.pillText, activityLevel === level && styles.pillTextActive]}>
-                  {level.replace('_', ' ')}
+                <Clock size={16} color="#64748b" style={{ marginRight: 6 }} />
+                <Text style={styles.input}>
+                  {formatTimeAMPM(defaultWakeTime || wakeTimeDate)}
                 </Text>
               </TouchableOpacity>
-            ))}
+
+              {isEditing && showWakePicker && (
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={wakeTimeDate}
+                    mode="time"
+                    is24Hour={false}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleWakeTimeChange}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity onPress={() => setShowWakePicker(false)} style={styles.datePickerDoneButton}>
+                      <Text style={styles.datePickerDoneText}>Done</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+
+            {/* Sleep Time Picker */}
+            <View style={[styles.fieldGroup, { flex: 1 }]}>
+              <Text style={styles.label}>Sleep Time</Text>
+              <TouchableOpacity
+                onPress={() => isEditing && setShowSleepPicker(true)}
+                activeOpacity={0.7}
+                style={[styles.inputContainer, !isEditing && styles.disabledInput]}
+                disabled={!isEditing}
+              >
+                <Clock size={16} color="#64748b" style={{ marginRight: 6 }} />
+                <Text style={styles.input}>
+                  {formatTimeAMPM(defaultSleepTime || sleepTimeDate)}
+                </Text>
+              </TouchableOpacity>
+
+              {isEditing && showSleepPicker && (
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={sleepTimeDate}
+                    mode="time"
+                    is24Hour={false}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleSleepTimeChange}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity onPress={() => setShowSleepPicker(false)} style={styles.datePickerDoneButton}>
+                      <Text style={styles.datePickerDoneText}>Done</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
           </View>
-        </View>
 
-        <Text style={styles.sectionTitle}>Application Features</Text>
+          {/* Personality Dropdown */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Personality Type</Text>
+            <TouchableOpacity
+              style={[styles.dropdownContainer, !isEditing && styles.disabledInput]}
+              onPress={() => isEditing && setShowPersonalityDropdown(!showPersonalityDropdown)}
+              activeOpacity={0.8}
+              disabled={!isEditing}
+            >
+              <Text style={styles.dropdownText}>
+                {personalityType ? personalityType.replace('_', ' ') : 'Select Personality Type'}
+              </Text>
+              <ChevronDown size={18} color="#64748b" />
+            </TouchableOpacity>
 
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Islamic Features</Text>
-          <Switch
-            value={enableIslamicFeatures}
-            onValueChange={setEnableIslamicFeatures}
-            trackColor={{ false: '#334155', true: '#3b82f6' }}
-            thumbColor="#ffffff"
-            disabled={!isEditing}
-          />
-        </View>
-
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Mail Assistance</Text>
-          <Switch
-            value={enableMailAssistance}
-            onValueChange={setEnableMailAssistance}
-            trackColor={{ false: '#334155', true: '#3b82f6' }}
-            thumbColor="#ffffff"
-            disabled={!isEditing}
-          />
-        </View>
-
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Finance Tracker</Text>
-          <Switch
-            value={enableFinanceTracker}
-            onValueChange={setEnableFinanceTracker}
-            trackColor={{ false: '#334155', true: '#3b82f6' }}
-            thumbColor="#ffffff"
-            disabled={!isEditing}
-          />
-        </View>
-
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Health Tracking</Text>
-          <Switch
-            value={enableHealthTracking}
-            onValueChange={setEnableHealthTracking}
-            trackColor={{ false: '#334155', true: '#3b82f6' }}
-            thumbColor="#ffffff"
-            disabled={!isEditing}
-          />
-        </View>
-
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Screen Time Tracking</Text>
-          <Switch
-            value={enableScreenTimeTracking}
-            onValueChange={setEnableScreenTimeTracking}
-            trackColor={{ false: '#334155', true: '#3b82f6' }}
-            thumbColor="#ffffff"
-            disabled={!isEditing}
-          />
-        </View>
-
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>AI Briefings</Text>
-          <Switch
-            value={enableAiBriefings}
-            onValueChange={setEnableAiBriefings}
-            trackColor={{ false: '#334155', true: '#3b82f6' }}
-            thumbColor="#ffffff"
-            disabled={!isEditing}
-          />
-        </View>
-
-        {isEditing && (
-          <TouchableOpacity
-            style={[styles.saveButton, updating && styles.disabledButton]}
-            onPress={handleUpdateProfile}
-            disabled={updating}
-            activeOpacity={0.8}
-          >
-            {updating ? (
-              <ActivityIndicator color="#ffffff" size="small" />
-            ) : (
-              <>
-                <Check size={18} color="#ffffff" />
-                <Text style={styles.saveButtonText}>Save Changes</Text>
-              </>
+            {isEditing && showPersonalityDropdown && (
+              <View style={styles.dropdownMenu}>
+                <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                  {PERSONALITY_TYPES.map((type) => {
+                    const isSelected = personalityType === type;
+                    return (
+                      <TouchableOpacity
+                        key={type}
+                        style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
+                        onPress={() => {
+                          setPersonalityType(isSelected ? null : type);
+                          setShowPersonalityDropdown(false);
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}>
+                          {type.replace('_', ' ')}
+                        </Text>
+                        {isSelected && <Check size={16} color="#3b82f6" />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             )}
-          </TouchableOpacity>
+          </View>
+
+          {/* Section: Location Details */}
+          <Text style={styles.sectionTitle}>Location Information</Text>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Location</Text>
+            <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
+              <TextInput
+                style={styles.input}
+                value={location}
+                onChangeText={setLocation}
+                placeholder="Detailed location address"
+                placeholderTextColor="#475569"
+                editable={isEditing}
+              />
+              <TouchableOpacity
+                onPress={handleGetGPSLocation}
+                disabled={!isEditing || fetchingLocation}
+                activeOpacity={0.7}
+                style={{ paddingLeft: 8, opacity: !isEditing ? 0.4 : 1 }}
+              >
+                {fetchingLocation ? (
+                  <ActivityIndicator size="small" color="#3b82f6" />
+                ) : (
+                  <MapPin size={18} color={!isEditing ? '#94a3b8' : '#3b82f6'} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Section: Health & Focus Metrics */}
+          <Text style={styles.sectionTitle}>Health & Daily Focus</Text>
+
+          <View style={styles.rowFields}>
+            <View style={[styles.fieldGroup, { flex: 1.6 }]}>
+              <Text style={styles.label}>Height</Text>
+              {isEditing ? (
+                <View style={styles.heightPickerRow}>
+                  <View style={styles.heightSegment}>
+                    <Ruler color="#64748b" size={14} />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSelector}>
+                      {[3, 4, 5, 6, 7].map((ft) => (
+                        <TouchableOpacity
+                          key={ft}
+                          style={[styles.unitChip, heightFeet === ft && styles.unitChipActive]}
+                          onPress={() => setHeightFeet(ft)}
+                        >
+                          <Text style={[styles.unitChipText, heightFeet === ft && styles.unitChipTextActive]}>
+                            {ft}'
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  <View style={styles.heightSegment}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSelector}>
+                      {Array.from({ length: 12 }, (_, i) => i).map((inch) => (
+                        <TouchableOpacity
+                          key={inch}
+                          style={[styles.unitChip, heightInches === inch && styles.unitChipActive]}
+                          onPress={() => setHeightInches(inch)}
+                        >
+                          <Text style={[styles.unitChipText, heightInches === inch && styles.unitChipTextActive]}>
+                            {inch}"
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              ) : (
+                <View style={[styles.inputContainer, styles.disabledInput]}>
+                  <Ruler color="#64748b" size={14} style={{ marginRight: 8 }} />
+                  <Text style={styles.input}>{`${heightFeet}'${heightInches}''`}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={[styles.fieldGroup, { flex: 1 }]}>
+              <Text style={styles.label}>Weight</Text>
+              <View style={[styles.weightInputContainer, !isEditing && styles.disabledInput]}>
+                <WeightIcon color="#64748b" size={14} />
+                <TextInput
+                  value={weight}
+                  onChangeText={setWeight}
+                  placeholder="70.5"
+                  placeholderTextColor="#475569"
+                  keyboardType="decimal-pad"
+                  style={styles.weightInput}
+                  editable={isEditing}
+                />
+                <Text style={styles.unitSuffix}>kg</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Daily Target Focus</Text>
+            <View style={[styles.inputContainer, !isEditing && styles.disabledInput]}>
+              <TextInput
+                style={styles.input}
+                value={dailyTargetFocus}
+                onChangeText={setDailyTargetFocus}
+                placeholder="e.g. Fitness, Coding, Productivity"
+                placeholderTextColor="#475569"
+                editable={isEditing}
+              />
+            </View>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Gender</Text>
+            <View style={styles.pillRow}>
+              {(['MALE', 'FEMALE'] as const).map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  style={[
+                    styles.pillButton,
+                    gender === g && styles.pillButtonActive,
+                    !isEditing && styles.disabledPill,
+                  ]}
+                  onPress={() => isEditing && setGender(g)}
+                  disabled={!isEditing}
+                >
+                  <Text style={[styles.pillText, gender === g && styles.pillTextActive]}>{g}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Activity Level</Text>
+            <View style={styles.pillWrap}>
+              {(['SEDENTARY', 'LIGHTLY_ACTIVE', 'MODERATELY_ACTIVE', 'VERY_ACTIVE'] as const).map((level) => (
+                <TouchableOpacity
+                  key={level}
+                  style={[
+                    styles.pillButton,
+                    activityLevel === level && styles.pillButtonActive,
+                    !isEditing && styles.disabledPill,
+                  ]}
+                  onPress={() => isEditing && setActivityLevel(level)}
+                  disabled={!isEditing}
+                >
+                  <Text style={[styles.pillText, activityLevel === level && styles.pillTextActive]}>
+                    {level.replace('_', ' ')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>Application Features</Text>
+
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Islamic Features</Text>
+            <Switch
+              value={enableIslamicFeatures}
+              onValueChange={setEnableIslamicFeatures}
+              trackColor={{ false: '#334155', true: '#3b82f6' }}
+              thumbColor="#ffffff"
+              disabled={!isEditing}
+            />
+          </View>
+
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Mail Assistance</Text>
+            <Switch
+              value={enableMailAssistance}
+              onValueChange={setEnableMailAssistance}
+              trackColor={{ false: '#334155', true: '#3b82f6' }}
+              thumbColor="#ffffff"
+              disabled={!isEditing}
+            />
+          </View>
+
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Finance Tracker</Text>
+            <Switch
+              value={enableFinanceTracker}
+              onValueChange={setEnableFinanceTracker}
+              trackColor={{ false: '#334155', true: '#3b82f6' }}
+              thumbColor="#ffffff"
+              disabled={!isEditing}
+            />
+          </View>
+
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Health Tracking</Text>
+            <Switch
+              value={enableHealthTracking}
+              onValueChange={setEnableHealthTracking}
+              trackColor={{ false: '#334155', true: '#3b82f6' }}
+              thumbColor="#ffffff"
+              disabled={!isEditing}
+            />
+          </View>
+
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Screen Time Tracking</Text>
+            <Switch
+              value={enableScreenTimeTracking}
+              onValueChange={setEnableScreenTimeTracking}
+              trackColor={{ false: '#334155', true: '#3b82f6' }}
+              thumbColor="#ffffff"
+              disabled={!isEditing}
+            />
+          </View>
+
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>AI Briefings</Text>
+            <Switch
+              value={enableAiBriefings}
+              onValueChange={setEnableAiBriefings}
+              trackColor={{ false: '#334155', true: '#3b82f6' }}
+              thumbColor="#ffffff"
+              disabled={!isEditing}
+            />
+          </View>
+
+          {isEditing && (
+            <TouchableOpacity
+              style={[styles.saveButton, updating && styles.disabledButton]}
+              onPress={handleUpdateProfile}
+              disabled={updating}
+              activeOpacity={0.8}
+            >
+              {updating ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <>
+                  <Check size={18} color="#ffffff" />
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Floating Logout Button — bottom right, always visible above scroll content */}
+      <TouchableOpacity
+        style={[
+          styles.fabLogout,
+          { bottom: insets.bottom + 20 },
+          loggingOut && styles.disabledButton,
+        ]}
+        onPress={handleLogout}
+        disabled={loggingOut}
+        activeOpacity={0.85}
+      >
+        {loggingOut ? (
+          <ActivityIndicator color="#ffffff" size="small" />
+        ) : (
+          <LogOut size={22} color="#ffffff" />
         )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -1243,5 +1289,22 @@ const styles = StyleSheet.create({
   dropdownItemTextActive: {
     color: '#3b82f6',
     fontWeight: 'bold',
+  },
+
+  /* --- Floating Logout Button --- */
+  fabLogout: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
   },
 });
