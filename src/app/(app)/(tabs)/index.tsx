@@ -4,12 +4,9 @@ import {
   FlatList,
   RefreshControl,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LogOut } from 'lucide-react-native';
 
 // Components
 import { QuranCard } from '@/components/cards/QuranCard';
@@ -21,7 +18,6 @@ import { EodSuggestionCard } from '@/components/cards/EodSuggestionCard';
 import { FloatingActionButton } from '@/components/common/FloatingActionButton';
 
 // Context & Services & Types
-import { useAuth } from '@/context/AuthContext';
 import { dashboardService } from '@/services/dashboardService';
 import { TodayOverviewResponse } from '@/types/dashboard';
 import {
@@ -35,8 +31,7 @@ type HomeScreenSection =
   | { id: 'quran' }
   | { id: 'tasks' }
   | { id: 'overview' }
-  | { id: 'eod_suggestion' }
-  | { id: 'footer' };
+  | { id: 'eod_suggestion' };
 
 const SECTIONS: HomeScreenSection[] = [
   { id: 'weather' },
@@ -44,11 +39,9 @@ const SECTIONS: HomeScreenSection[] = [
   { id: 'tasks' },
   { id: 'overview' },
   { id: 'eod_suggestion' },
-  { id: 'footer' },
 ];
 
 export default function HomeScreen() {
-  const { logout } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Today Overview State
@@ -134,16 +127,6 @@ export default function HomeScreen() {
       case 'eod_suggestion':
         return <EodSuggestionCard />;
 
-      case 'footer':
-        return (
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-              <LogOut size={18} color="#ef4444" />
-              <Text style={styles.logoutText}>Sign Out</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
       default:
         return null;
     }
@@ -159,7 +142,7 @@ export default function HomeScreen() {
           styles.listContent,
           {
             paddingTop: insets.top + 4,
-            paddingBottom: insets.bottom + 95,
+            paddingBottom: insets.bottom + 20, // Tightened bottom padding to remove extra space
           },
         ]}
         refreshControl={
@@ -195,46 +178,5 @@ const styles = StyleSheet.create({
   },
   pocketContainer: {
     marginTop: 0,
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: 8,
-    paddingBottom: 12,
-    gap: 10,
-  },
-  screenTimeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1e293b',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 14,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  screenTimeText: {
-    color: '#f8fafc',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#111729',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 14,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-  },
-  logoutText: {
-    color: '#ef4444',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

@@ -7,8 +7,9 @@ import {
   View,
 } from 'react-native';
 import { AlertCircle, RefreshCw, Sparkles } from 'lucide-react-native';
-import { aiService } from '@/services/aiService'; // Adjust path as needed
-import { SuggestionContextType} from '@/types/ai'; // Adjust path as needed
+import { aiService } from '@/services/aiService'; // Adjust path
+import { SuggestionContextType, SuggestionResponse } from '@/types/ai'; // Adjust path
+import { renderFormattedText } from '@/utils/textFormatter'; // Adjust import path to your utility
 
 interface EodSuggestionCardProps {
   userContext?: string;
@@ -104,7 +105,13 @@ export const EodSuggestionCard: React.FC<EodSuggestionCardProps> = ({ userContex
             </TouchableOpacity>
           </View>
         ) : (
-          <Text style={styles.suggestionText}>{suggestion}</Text>
+          <Text style={styles.suggestionText}>
+            {renderFormattedText(
+              suggestion || '',
+              styles.baseTextStyle,
+              styles.boldTextStyle
+            )}
+          </Text>
         )}
       </View>
 
@@ -200,9 +207,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   suggestionText: {
+    lineHeight: 20,
+  },
+  baseTextStyle: {
     color: '#CBD5E1',
     fontSize: 13,
     lineHeight: 20,
+  },
+  boldTextStyle: {
+    color: '#F8FAFC',
+    fontWeight: '700',
   },
   footer: {
     flexDirection: 'row',
